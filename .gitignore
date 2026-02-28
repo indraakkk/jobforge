@@ -10,6 +10,7 @@ node_modules/
 dist/
 .output/
 .vinxi/
+.vite/
 
 # Bun
 .bun/
@@ -19,6 +20,14 @@ result/
 
 # OS
 .DS_Store
+
+# Devenv / Nix
+.devenv/
+.devenv.flake.nix
+.direnv/
+
+# TanStack
+.tanstack/
 
 # Claude Code local settings
 .claude/settings.local.json

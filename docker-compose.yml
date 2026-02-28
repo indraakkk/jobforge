@@ -1,0 +1,27 @@
+services:
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: jobforge
+      MINIO_ROOT_PASSWORD: jobforge-secret
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 3;
+      mc alias set local http://minio:9000 jobforge jobforge-secret;
+      mc mb local/cv-files --ignore-existing;
+      echo 'Bucket cv-files created';
+      "
+
+volumes:
+  minio-data:
