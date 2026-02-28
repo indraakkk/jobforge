@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from "effect";
-import { StorageError } from "../errors";
+import { StorageError } from "~/lib/errors";
 
 export class StorageService extends Context.Tag("StorageService")<
   StorageService,

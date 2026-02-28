@@ -1,7 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import { AppLive } from "~/lib/layers/AppLive";
-import type { ApplicationFilters, ApplicationSort } from "~/lib/schemas/application";
+import {
+  type ApplicationFilters,
+  type ApplicationSort,
+  CreateApplication,
+  UpdateApplication,
+} from "~/lib/schemas/application";
 import { ApplicationService } from "~/lib/services/ApplicationService";
 
 export const getApplications = createServerFn({ method: "GET" })
@@ -42,28 +47,11 @@ export const getApplication = createServerFn({ method: "GET" })
   });
 
 export const createApplication = createServerFn({ method: "POST" })
-  .inputValidator(
-    (input: {
-      company: string;
-      role: string;
-      url?: string | null;
-      status?: string;
-      job_description?: string | null;
-      salary_range?: string | null;
-      location?: string | null;
-      platform?: string | null;
-      contact_name?: string | null;
-      contact_email?: string | null;
-      notes?: string | null;
-      applied_at?: string | null;
-      next_action?: string | null;
-      next_action_date?: string | null;
-    }) => input,
-  )
+  .inputValidator((input: unknown) => Schema.decodeUnknownSync(CreateApplication)(input))
   .handler(async ({ data }) => {
     return Effect.runPromise(
       ApplicationService.pipe(
-        Effect.flatMap((svc) => svc.create(data as any)),
+        Effect.flatMap((svc) => svc.create(data)),
         Effect.map((app) => ({ ...app })),
         Effect.provide(AppLive),
       ),
@@ -71,30 +59,15 @@ export const createApplication = createServerFn({ method: "POST" })
   });
 
 export const updateApplication = createServerFn({ method: "POST" })
-  .inputValidator(
-    (input: {
-      id: string;
-      company?: string;
-      role?: string;
-      url?: string | null;
-      status?: string;
-      job_description?: string | null;
-      salary_range?: string | null;
-      location?: string | null;
-      platform?: string | null;
-      contact_name?: string | null;
-      contact_email?: string | null;
-      notes?: string | null;
-      applied_at?: string | null;
-      next_action?: string | null;
-      next_action_date?: string | null;
-    }) => input,
-  )
+  .inputValidator((input: unknown) => {
+    const { id, ...rest } = input as { id: string; [k: string]: unknown };
+    return { id, ...Schema.decodeUnknownSync(UpdateApplication)(rest) };
+  })
   .handler(async ({ data }) => {
     const { id, ...rest } = data;
     return Effect.runPromise(
       ApplicationService.pipe(
-        Effect.flatMap((svc) => svc.update(id, rest as any)),
+        Effect.flatMap((svc) => svc.update(id, rest)),
         Effect.map((app) => ({ ...app })),
         Effect.provide(AppLive),
       ),

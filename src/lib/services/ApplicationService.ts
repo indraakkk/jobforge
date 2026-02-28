@@ -1,7 +1,7 @@
 import { SqlClient } from "@effect/sql";
 import { SqlError } from "@effect/sql/SqlError";
 import { Context, Effect, Layer, Schema } from "effect";
-import { ApplicationNotFoundError, ApplicationValidationError } from "../errors";
+import { ApplicationNotFoundError, ApplicationValidationError } from "~/lib/errors";
 import {
   Application,
   type ApplicationFilters,
@@ -10,7 +10,7 @@ import {
   type CreateApplication,
   PaginatedResult,
   type UpdateApplication,
-} from "../schemas/application";
+} from "~/lib/schemas/application";
 
 const decodeApplication = Schema.decodeUnknown(Application);
 
@@ -49,60 +49,39 @@ export const ApplicationServiceLive = Layer.effect(
     return {
       getAll: (filters, sort, page = 1, pageSize = 20) =>
         Effect.gen(function* () {
-          const _conditions: string[] = [];
-          const sortField = sort?.field ?? "created_at";
-          const sortDir = sort?.direction ?? "desc";
+          // Whitelist sort field/direction to prevent sql.unsafe injection
+          const SORT_FIELDS: Record<string, string> = {
+            company: "company",
+            role: "role",
+            status: "status",
+            applied_at: "applied_at",
+            created_at: "created_at",
+            updated_at: "updated_at",
+          };
+          const safeField = SORT_FIELDS[sort?.field ?? "created_at"] ?? "created_at";
+          const safeDir = sort?.direction === "asc" ? "ASC" : "DESC";
 
-          let countResult: ReadonlyArray<any>;
-          let rows: ReadonlyArray<any>;
+          const statusFilter: string | null = filters?.status ?? null;
+          const searchFilter: string | null = filters?.search ? `%${filters.search}%` : null;
 
-          if (filters?.status && filters?.search) {
-            countResult = yield* sql`
-              SELECT count(*)::int as total FROM applications
-              WHERE status = ${filters.status}
-              AND (company ILIKE ${`%${filters.search}%`} OR role ILIKE ${`%${filters.search}%`})
-            `;
-            rows = yield* sql`
-              SELECT * FROM applications
-              WHERE status = ${filters.status}
-              AND (company ILIKE ${`%${filters.search}%`} OR role ILIKE ${`%${filters.search}%`})
-              ORDER BY ${sql.unsafe(sortField)} ${sql.unsafe(sortDir)}
-              LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}
-            `;
-          } else if (filters?.status) {
-            countResult = yield* sql`
-              SELECT count(*)::int as total FROM applications
-              WHERE status = ${filters.status}
-            `;
-            rows = yield* sql`
-              SELECT * FROM applications
-              WHERE status = ${filters.status}
-              ORDER BY ${sql.unsafe(sortField)} ${sql.unsafe(sortDir)}
-              LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}
-            `;
-          } else if (filters?.search) {
-            countResult = yield* sql`
-              SELECT count(*)::int as total FROM applications
-              WHERE company ILIKE ${`%${filters.search}%`} OR role ILIKE ${`%${filters.search}%`}
-            `;
-            rows = yield* sql`
-              SELECT * FROM applications
-              WHERE company ILIKE ${`%${filters.search}%`} OR role ILIKE ${`%${filters.search}%`}
-              ORDER BY ${sql.unsafe(sortField)} ${sql.unsafe(sortDir)}
-              LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}
-            `;
-          } else {
-            countResult = yield* sql`
-              SELECT count(*)::int as total FROM applications
-            `;
-            rows = yield* sql`
-              SELECT * FROM applications
-              ORDER BY ${sql.unsafe(sortField)} ${sql.unsafe(sortDir)}
-              LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}
-            `;
-          }
+          const countResult = yield* sql`
+            SELECT count(*)::int as total FROM applications
+            WHERE (${statusFilter}::text IS NULL OR status = ${statusFilter})
+              AND (${searchFilter}::text IS NULL
+                   OR company ILIKE ${searchFilter}
+                   OR role ILIKE ${searchFilter})
+          `;
+          const rows = yield* sql`
+            SELECT * FROM applications
+            WHERE (${statusFilter}::text IS NULL OR status = ${statusFilter})
+              AND (${searchFilter}::text IS NULL
+                   OR company ILIKE ${searchFilter}
+                   OR role ILIKE ${searchFilter})
+            ORDER BY ${sql.unsafe(safeField)} ${sql.unsafe(safeDir)}
+            LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}
+          `;
 
-          const total = countResult[0]?.total ?? 0;
+          const total = (countResult[0]?.total as number) ?? 0;
           const items = yield* Effect.forEach(rows, (row) =>
             decodeApplication(row).pipe(
               Effect.mapError(

@@ -1,6 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { StatusBadge } from "~/components/StatusBadge";
+import { ApplicationStatus } from "~/lib/schemas/application";
 import { getApplications } from "~/server/functions/applications";
+
+const VALID_STATUSES = new Set<string>(ApplicationStatus.literals);
 
 const statusTabs = [
   { key: undefined, label: "All" },
@@ -14,14 +17,17 @@ const statusTabs = [
 ] as const;
 
 interface SearchParams {
-  status?: string;
+  status?: typeof ApplicationStatus.Type;
   search?: string;
   page?: number;
 }
 
 export const Route = createFileRoute("/applications/")({
   validateSearch: (search: Record<string, unknown>): SearchParams => ({
-    status: search.status as string | undefined,
+    status:
+      typeof search.status === "string" && VALID_STATUSES.has(search.status)
+        ? (search.status as typeof ApplicationStatus.Type)
+        : undefined,
     search: search.search as string | undefined,
     page: Number(search.page) || 1,
   }),
@@ -30,7 +36,7 @@ export const Route = createFileRoute("/applications/")({
     return getApplications({
       data: {
         filters: {
-          status: deps.status as any,
+          status: deps.status,
           search: deps.search,
         },
         page: deps.page,
@@ -124,7 +130,7 @@ function ApplicationsList() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {(data.items as Array<Record<string, any>>).map((app) => (
+            {data.items.map((app) => (
               <tr key={app.id} className="hover:bg-accent/50 transition-colors">
                 <td className="px-4 py-3">
                   <Link
