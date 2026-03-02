@@ -8,21 +8,23 @@ import { QAInlineForm } from "~/components/QAInlineForm";
 import { StatusBadge } from "~/components/StatusBadge";
 import { StatusPipeline } from "~/components/StatusPipeline";
 import { deleteApplication, getApplication } from "~/server/functions/applications";
+import { getCVsByApplication, type SerializedCVFile } from "~/server/functions/cv";
 import { deleteQAEntry, getQAEntriesByApplication, updateQAEntry } from "~/server/functions/qa";
 
 export const Route = createFileRoute("/applications/$id/")({
   loader: async ({ params }) => {
-    const [app, qaEntries] = await Promise.all([
+    const [app, qaEntries, linkedCVs] = await Promise.all([
       getApplication({ data: { id: params.id } }),
       getQAEntriesByApplication({ data: { applicationId: params.id } }),
+      getCVsByApplication({ data: { applicationId: params.id } }) as Promise<SerializedCVFile[]>,
     ]);
-    return { app, qaEntries };
+    return { app, qaEntries, linkedCVs };
   },
   component: ApplicationWorkspace,
 });
 
 function ApplicationWorkspace() {
-  const { app, qaEntries } = Route.useLoaderData();
+  const { app, qaEntries, linkedCVs } = Route.useLoaderData();
   const navigate = useNavigate();
   const router = useRouter();
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -133,7 +135,7 @@ function ApplicationWorkspace() {
 
         {/* Right panel: CV Preview */}
         <div>
-          <CVPreviewPanel />
+          <CVPreviewPanel applicationId={app.id} linkedCVs={linkedCVs} />
         </div>
       </div>
 

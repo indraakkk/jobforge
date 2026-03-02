@@ -39,7 +39,6 @@ const navItems = [
     title: "CV Manager",
     url: "/cv",
     icon: FileText,
-    disabled: true,
   },
   {
     title: "AI Tailor",

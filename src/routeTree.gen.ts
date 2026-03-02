@@ -11,12 +11,15 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as QaIndexRouteImport } from './routes/qa/index'
+import { Route as CvIndexRouteImport } from './routes/cv/index'
 import { Route as ApplicationsIndexRouteImport } from './routes/applications/index'
 import { Route as QaNewRouteImport } from './routes/qa/new'
 import { Route as QaIdRouteImport } from './routes/qa/$id'
+import { Route as CvUploadRouteImport } from './routes/cv/upload'
 import { Route as ApplicationsNewRouteImport } from './routes/applications/new'
 import { Route as ApplicationsIdRouteImport } from './routes/applications/$id'
 import { Route as QaIdIndexRouteImport } from './routes/qa/$id/index'
+import { Route as CvIdIndexRouteImport } from './routes/cv/$id/index'
 import { Route as ApplicationsIdIndexRouteImport } from './routes/applications/$id/index'
 import { Route as QaIdEditRouteImport } from './routes/qa/$id/edit'
 import { Route as ApplicationsIdEditRouteImport } from './routes/applications/$id/edit'
@@ -29,6 +32,11 @@ const IndexRoute = IndexRouteImport.update({
 const QaIndexRoute = QaIndexRouteImport.update({
   id: '/qa/',
   path: '/qa/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CvIndexRoute = CvIndexRouteImport.update({
+  id: '/cv/',
+  path: '/cv/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApplicationsIndexRoute = ApplicationsIndexRouteImport.update({
@@ -46,6 +54,11 @@ const QaIdRoute = QaIdRouteImport.update({
   path: '/qa/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CvUploadRoute = CvUploadRouteImport.update({
+  id: '/cv/upload',
+  path: '/cv/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApplicationsNewRoute = ApplicationsNewRouteImport.update({
   id: '/applications/new',
   path: '/applications/new',
@@ -60,6 +73,11 @@ const QaIdIndexRoute = QaIdIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => QaIdRoute,
+} as any)
+const CvIdIndexRoute = CvIdIndexRouteImport.update({
+  id: '/cv/$id/',
+  path: '/cv/$id/',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApplicationsIdIndexRoute = ApplicationsIdIndexRouteImport.update({
   id: '/',
@@ -81,24 +99,30 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/applications/$id': typeof ApplicationsIdRouteWithChildren
   '/applications/new': typeof ApplicationsNewRoute
+  '/cv/upload': typeof CvUploadRoute
   '/qa/$id': typeof QaIdRouteWithChildren
   '/qa/new': typeof QaNewRoute
   '/applications/': typeof ApplicationsIndexRoute
+  '/cv/': typeof CvIndexRoute
   '/qa/': typeof QaIndexRoute
   '/applications/$id/edit': typeof ApplicationsIdEditRoute
   '/qa/$id/edit': typeof QaIdEditRoute
   '/applications/$id/': typeof ApplicationsIdIndexRoute
+  '/cv/$id/': typeof CvIdIndexRoute
   '/qa/$id/': typeof QaIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/applications/new': typeof ApplicationsNewRoute
+  '/cv/upload': typeof CvUploadRoute
   '/qa/new': typeof QaNewRoute
   '/applications': typeof ApplicationsIndexRoute
+  '/cv': typeof CvIndexRoute
   '/qa': typeof QaIndexRoute
   '/applications/$id/edit': typeof ApplicationsIdEditRoute
   '/qa/$id/edit': typeof QaIdEditRoute
   '/applications/$id': typeof ApplicationsIdIndexRoute
+  '/cv/$id': typeof CvIdIndexRoute
   '/qa/$id': typeof QaIdIndexRoute
 }
 export interface FileRoutesById {
@@ -106,13 +130,16 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/applications/$id': typeof ApplicationsIdRouteWithChildren
   '/applications/new': typeof ApplicationsNewRoute
+  '/cv/upload': typeof CvUploadRoute
   '/qa/$id': typeof QaIdRouteWithChildren
   '/qa/new': typeof QaNewRoute
   '/applications/': typeof ApplicationsIndexRoute
+  '/cv/': typeof CvIndexRoute
   '/qa/': typeof QaIndexRoute
   '/applications/$id/edit': typeof ApplicationsIdEditRoute
   '/qa/$id/edit': typeof QaIdEditRoute
   '/applications/$id/': typeof ApplicationsIdIndexRoute
+  '/cv/$id/': typeof CvIdIndexRoute
   '/qa/$id/': typeof QaIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -121,37 +148,46 @@ export interface FileRouteTypes {
     | '/'
     | '/applications/$id'
     | '/applications/new'
+    | '/cv/upload'
     | '/qa/$id'
     | '/qa/new'
     | '/applications/'
+    | '/cv/'
     | '/qa/'
     | '/applications/$id/edit'
     | '/qa/$id/edit'
     | '/applications/$id/'
+    | '/cv/$id/'
     | '/qa/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/applications/new'
+    | '/cv/upload'
     | '/qa/new'
     | '/applications'
+    | '/cv'
     | '/qa'
     | '/applications/$id/edit'
     | '/qa/$id/edit'
     | '/applications/$id'
+    | '/cv/$id'
     | '/qa/$id'
   id:
     | '__root__'
     | '/'
     | '/applications/$id'
     | '/applications/new'
+    | '/cv/upload'
     | '/qa/$id'
     | '/qa/new'
     | '/applications/'
+    | '/cv/'
     | '/qa/'
     | '/applications/$id/edit'
     | '/qa/$id/edit'
     | '/applications/$id/'
+    | '/cv/$id/'
     | '/qa/$id/'
   fileRoutesById: FileRoutesById
 }
@@ -159,10 +195,13 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApplicationsIdRoute: typeof ApplicationsIdRouteWithChildren
   ApplicationsNewRoute: typeof ApplicationsNewRoute
+  CvUploadRoute: typeof CvUploadRoute
   QaIdRoute: typeof QaIdRouteWithChildren
   QaNewRoute: typeof QaNewRoute
   ApplicationsIndexRoute: typeof ApplicationsIndexRoute
+  CvIndexRoute: typeof CvIndexRoute
   QaIndexRoute: typeof QaIndexRoute
+  CvIdIndexRoute: typeof CvIdIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -179,6 +218,13 @@ declare module '@tanstack/react-router' {
       path: '/qa'
       fullPath: '/qa/'
       preLoaderRoute: typeof QaIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cv/': {
+      id: '/cv/'
+      path: '/cv'
+      fullPath: '/cv/'
+      preLoaderRoute: typeof CvIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/applications/': {
@@ -202,6 +248,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof QaIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cv/upload': {
+      id: '/cv/upload'
+      path: '/cv/upload'
+      fullPath: '/cv/upload'
+      preLoaderRoute: typeof CvUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/applications/new': {
       id: '/applications/new'
       path: '/applications/new'
@@ -222,6 +275,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/qa/$id/'
       preLoaderRoute: typeof QaIdIndexRouteImport
       parentRoute: typeof QaIdRoute
+    }
+    '/cv/$id/': {
+      id: '/cv/$id/'
+      path: '/cv/$id'
+      fullPath: '/cv/$id/'
+      preLoaderRoute: typeof CvIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/applications/$id/': {
       id: '/applications/$id/'
@@ -277,10 +337,13 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApplicationsIdRoute: ApplicationsIdRouteWithChildren,
   ApplicationsNewRoute: ApplicationsNewRoute,
+  CvUploadRoute: CvUploadRoute,
   QaIdRoute: QaIdRouteWithChildren,
   QaNewRoute: QaNewRoute,
   ApplicationsIndexRoute: ApplicationsIndexRoute,
+  CvIndexRoute: CvIndexRoute,
   QaIndexRoute: QaIndexRoute,
+  CvIdIndexRoute: CvIdIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
