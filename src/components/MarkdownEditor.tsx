@@ -9,7 +9,7 @@ interface Props {
 
 export function MarkdownEditor({ value, onChange, placeholder, height = 300 }: Props) {
   return (
-    <div data-color-mode="dark">
+    <div data-color-mode="light">
       <MDEditor
         value={value}
         onChange={(val) => onChange(val ?? "")}

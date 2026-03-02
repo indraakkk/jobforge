@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDeleteDialog } from "~/components/ConfirmDeleteDialog";
 import { getApplication } from "~/server/functions/applications";
 import { deleteQAEntry, getQAEntry } from "~/server/functions/qa";
 
@@ -18,19 +19,13 @@ function QADetail() {
   const { entry, app } = Route.useLoaderData();
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   async function handleCopy() {
     await navigator.clipboard.writeText(entry.answer);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }
-
-  async function handleDelete() {
-    if (!confirm("Delete this Q&A entry?")) return;
-    setDeleting(true);
-    await deleteQAEntry({ data: { id: entry.id } });
-    navigate({ to: "/qa" });
   }
 
   return (
@@ -60,12 +55,28 @@ function QADetail() {
           </Link>
           <button
             type="button"
-            onClick={handleDelete}
+            onClick={() => setDeleteOpen(true)}
             disabled={deleting}
             className="rounded-md border border-destructive/50 bg-card px-4 py-2 text-sm font-medium text-destructive shadow-sm hover:bg-destructive/10 transition-colors disabled:opacity-50"
           >
             {deleting ? "Deleting..." : "Delete"}
           </button>
+          <ConfirmDeleteDialog
+            open={deleteOpen}
+            onOpenChange={setDeleteOpen}
+            title="Delete this Q&A entry?"
+            description="This action cannot be undone."
+            loading={deleting}
+            onConfirm={async () => {
+              setDeleting(true);
+              try {
+                await deleteQAEntry({ data: { id: entry.id } });
+                navigate({ to: "/qa", search: { query: "", tags: "", page: 1 } });
+              } finally {
+                setDeleting(false);
+              }
+            }}
+          />
         </div>
       </div>
 

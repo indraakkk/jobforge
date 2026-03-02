@@ -1,31 +1,37 @@
 import { Check, Copy, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDeleteDialog } from "~/components/ConfirmDeleteDialog";
 
 interface QAEntryData {
   id: string;
   application_id: string;
   question: string;
   answer: string;
-  tags: string[];
+  tags: readonly string[];
 }
 
 interface Props {
   entry: QAEntryData;
   applicationName?: string;
   showAppLink?: boolean;
-  onSave?: (id: string, answer: string) => Promise<void>;
-  onDelete?: (id: string) => void;
+  onSave?: (id: string, answer: string, tags: string[]) => Promise<void>;
+  onDelete?: (id: string) => void | Promise<void>;
 }
 
-const inputClass =
-  "block w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground shadow-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring transition-colors resize-y";
+const inputBase =
+  "block w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground shadow-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring transition-colors";
+
+const inputClass = `${inputBase} resize-y`;
 
 export function QAEntryCard({ entry, applicationName, showAppLink, onSave, onDelete }: Props) {
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(entry.answer);
+  const [draftTags, setDraftTags] = useState(entry.tags.join(", "));
   const [saving, setSaving] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   async function handleCopy() {
     await navigator.clipboard.writeText(entry.answer);
@@ -36,13 +42,18 @@ export function QAEntryCard({ entry, applicationName, showAppLink, onSave, onDel
   async function handleSave() {
     if (!onSave) return;
     setSaving(true);
-    await onSave(entry.id, draft);
+    const tags = draftTags
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+    await onSave(entry.id, draft, tags);
     setSaving(false);
     setEditing(false);
   }
 
   function handleCancel() {
     setDraft(entry.answer);
+    setDraftTags(entry.tags.join(", "));
     setEditing(false);
   }
 
@@ -63,6 +74,12 @@ export function QAEntryCard({ entry, applicationName, showAppLink, onSave, onDel
               placeholder="Type your answer..."
               rows={4}
               className={inputClass}
+            />
+            <input
+              value={draftTags}
+              onChange={(e) => setDraftTags(e.target.value)}
+              placeholder="Tags (comma-separated, e.g. behavioral, technical)"
+              className={inputBase}
             />
             <div className="flex gap-2">
               <button
@@ -135,14 +152,32 @@ export function QAEntryCard({ entry, applicationName, showAppLink, onSave, onDel
               </button>
             )}
             {onDelete && (
-              <button
-                type="button"
-                onClick={() => onDelete(entry.id)}
-                className="rounded-md p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                title="Delete"
-              >
-                <Trash2 className="size-3.5" />
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => setDeleteOpen(true)}
+                  className="rounded-md p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+                <ConfirmDeleteDialog
+                  open={deleteOpen}
+                  onOpenChange={setDeleteOpen}
+                  title="Delete this Q&A entry?"
+                  description="This action cannot be undone."
+                  loading={deleteLoading}
+                  onConfirm={async () => {
+                    setDeleteLoading(true);
+                    try {
+                      await onDelete(entry.id);
+                      setDeleteOpen(false);
+                    } finally {
+                      setDeleteLoading(false);
+                    }
+                  }}
+                />
+              </>
             )}
           </div>
         </div>

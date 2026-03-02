@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
+import { ConfirmDeleteDialog } from "~/components/ConfirmDeleteDialog";
 import { CVPreviewPanel } from "~/components/CVPreviewPanel";
 import { MarkdownRenderer } from "~/components/MarkdownRenderer";
 import { QAEntryCard } from "~/components/QAEntryCard";
@@ -24,22 +25,15 @@ function ApplicationWorkspace() {
   const { app, qaEntries } = Route.useLoaderData();
   const navigate = useNavigate();
   const router = useRouter();
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  async function handleDelete() {
-    if (!confirm("Delete this application?")) return;
-    setDeleting(true);
-    await deleteApplication({ data: { id: app.id } });
-    navigate({ to: "/applications" });
-  }
-
-  async function handleSaveQA(id: string, answer: string) {
-    await updateQAEntry({ data: { id, answer } });
+  async function handleSaveQA(id: string, answer: string, tags: string[]) {
+    await updateQAEntry({ data: { id, answer, tags } });
     router.invalidate();
   }
 
   async function handleDeleteQA(id: string) {
-    if (!confirm("Delete this Q&A entry?")) return;
     await deleteQAEntry({ data: { id } });
     router.invalidate();
   }
@@ -63,12 +57,28 @@ function ApplicationWorkspace() {
           </Link>
           <button
             type="button"
-            onClick={handleDelete}
+            onClick={() => setDeleteOpen(true)}
             disabled={deleting}
             className="rounded-md border border-destructive/50 bg-card px-4 py-2 text-sm font-medium text-destructive shadow-sm hover:bg-destructive/10 transition-colors disabled:opacity-50"
           >
             {deleting ? "Deleting..." : "Delete"}
           </button>
+          <ConfirmDeleteDialog
+            open={deleteOpen}
+            onOpenChange={setDeleteOpen}
+            title="Delete this application?"
+            description="This will permanently delete the application and cannot be undone."
+            loading={deleting}
+            onConfirm={async () => {
+              setDeleting(true);
+              try {
+                await deleteApplication({ data: { id: app.id } });
+                navigate({ to: "/applications" });
+              } finally {
+                setDeleting(false);
+              }
+            }}
+          />
         </div>
       </div>
 

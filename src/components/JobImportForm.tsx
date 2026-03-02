@@ -1,4 +1,4 @@
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { MarkdownEditor } from "~/components/MarkdownEditor";
@@ -19,6 +19,11 @@ export function JobImportForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<JobImportResult | null>(null);
+  const [duplicateInfo, setDuplicateInfo] = useState<{
+    existingId: string;
+    existingCompany: string;
+    existingRole: string;
+  } | null>(null);
 
   // Editable fields after import
   const [company, setCompany] = useState("");
@@ -29,28 +34,57 @@ export function JobImportForm() {
   const [description, setDescription] = useState("");
   const [selectedQuestions, setSelectedQuestions] = useState<Record<number, boolean>>({});
 
+  function populateFields(data: JobImportResult) {
+    setResult(data);
+    setCompany(data.company);
+    setRole(data.role);
+    setLocation(data.location ?? "");
+    setSalary(data.salary ?? "");
+    setPlatform(data.platform ?? "");
+    setDescription(data.description);
+    const qs: Record<number, boolean> = {};
+    data.questions.forEach((_, i) => {
+      qs[i] = true;
+    });
+    setSelectedQuestions(qs);
+  }
+
   async function handleImport(e: React.FormEvent) {
     e.preventDefault();
     if (!url.trim()) return;
     setImporting(true);
     setError(null);
     setResult(null);
+    setDuplicateInfo(null);
 
     try {
-      const data = await importJobFromUrl({ data: { url: url.trim() } });
-      setResult(data);
-      setCompany(data.company);
-      setRole(data.role);
-      setLocation(data.location ?? "");
-      setSalary(data.salary ?? "");
-      setPlatform(data.platform ?? "");
-      setDescription(data.description);
-      // Select all questions by default
-      const qs: Record<number, boolean> = {};
-      data.questions.forEach((_, i) => {
-        qs[i] = true;
-      });
-      setSelectedQuestions(qs);
+      const response = await importJobFromUrl({ data: { url: url.trim() } });
+      if (response.type === "duplicate") {
+        setDuplicateInfo({
+          existingId: response.existingId,
+          existingCompany: response.existingCompany,
+          existingRole: response.existingRole,
+        });
+      } else {
+        populateFields(response.data);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to import job posting");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function handleForceImport() {
+    setImporting(true);
+    setError(null);
+    setDuplicateInfo(null);
+
+    try {
+      const response = await importJobFromUrl({ data: { url: url.trim(), force: true } });
+      if (response.type === "ok") {
+        populateFields(response.data);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to import job posting");
     } finally {
@@ -80,11 +114,13 @@ export function JobImportForm() {
       // Create Q&A entries for selected questions
       if (result?.questions) {
         const selected = result.questions.filter((_, i) => selectedQuestions[i]);
-        for (const question of selected) {
-          await createQAEntry({
-            data: { application_id: app.id, question, answer: "", tags: [] },
-          });
-        }
+        await Promise.all(
+          selected.map((question) =>
+            createQAEntry({
+              data: { application_id: app.id, question, answer: "", tags: [] },
+            }),
+          ),
+        );
       }
 
       navigate({ to: "/applications/$id", params: { id: app.id } });
@@ -99,6 +135,38 @@ export function JobImportForm() {
       {error && (
         <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
           {error}
+        </div>
+      )}
+
+      {duplicateInfo && (
+        <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-4 text-sm text-amber-700 dark:text-amber-400">
+          <p className="font-medium">
+            Already imported: {duplicateInfo.existingCompany} &mdash; {duplicateInfo.existingRole}
+          </p>
+          <div className="mt-2 flex items-center gap-3">
+            <Link
+              to="/applications/$id"
+              params={{ id: duplicateInfo.existingId }}
+              className="text-sm font-medium underline underline-offset-2 hover:text-amber-800 dark:hover:text-amber-300"
+            >
+              View existing
+            </Link>
+            <button
+              type="button"
+              onClick={handleForceImport}
+              disabled={importing}
+              className="rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-1 text-sm font-medium hover:bg-amber-500/20 transition-colors disabled:opacity-50"
+            >
+              {importing ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="size-3 animate-spin" />
+                  Importing...
+                </span>
+              ) : (
+                "Import anyway"
+              )}
+            </button>
+          </div>
         </div>
       )}
 

@@ -46,7 +46,7 @@ export const Route = createFileRoute("/qa/")({
 function QABrowse() {
   const { qaResult, allTags, appMap } = Route.useLoaderData();
   const search = Route.useSearch();
-  const navigate = useNavigate({ from: "/qa" });
+  const navigate = useNavigate({ from: "/qa/" });
 
   const [searchInput, setSearchInput] = useState(search.query);
   const activeTags = search.tags ? search.tags.split(",").filter(Boolean) : [];
@@ -74,13 +74,12 @@ function QABrowse() {
     });
   }
 
-  async function handleSave(id: string, answer: string) {
-    await updateQAEntry({ data: { id, answer } });
+  async function handleSave(id: string, answer: string, tags: string[]) {
+    await updateQAEntry({ data: { id, answer, tags } });
     navigate({ search: { query: search.query, tags: search.tags, page: search.page } });
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Delete this Q&A entry?")) return;
     await deleteQAEntry({ data: { id } });
     navigate({ search: { query: search.query, tags: search.tags, page: search.page } });
   }

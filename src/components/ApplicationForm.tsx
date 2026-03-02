@@ -5,7 +5,7 @@ import { MarkdownEditor } from "~/components/MarkdownEditor";
 import { type ApplicationFormValues, applicationFormSchema } from "~/lib/schemas/forms";
 
 interface Props {
-  defaultValues?: Partial<ApplicationFormValues>;
+  defaultValues?: { [K in keyof ApplicationFormValues]?: ApplicationFormValues[K] | null };
   onSubmit: (data: ApplicationFormValues) => Promise<void>;
   onCancel?: () => void;
   submitLabel: string;

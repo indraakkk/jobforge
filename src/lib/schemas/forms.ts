@@ -19,3 +19,12 @@ export const applicationFormSchema = z.object({
 });
 
 export type ApplicationFormValues = z.infer<typeof applicationFormSchema>;
+
+export const qaFormSchema = z.object({
+  question: z.string().min(1, "Question is required"),
+  answer: z.string().optional().default(""),
+  tags: z.string().optional().default(""),
+  application_id: z.string().min(1, "Application is required"),
+});
+
+export type QAFormValues = z.infer<typeof qaFormSchema>;
