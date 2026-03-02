@@ -61,3 +61,14 @@
 → Claude uses built-in Explore agent (haiku, fast, cheap)
 → Returns summary to main conversation
 ```
+
+<!-- EP_RULES_START -->
+
+## Effect Patterns Reference
+
+Full Effect TS patterns with code examples, anti-patterns, and tests live in the `docs/effect-patterns/` submodule (from [EffectPatterns](https://github.com/PaulJPhilp/EffectPatterns)).
+
+- **Patterns**: `docs/effect-patterns/content/published/patterns/` (16 categories)
+- **Update**: `bun patterns:update` (fetches latest from upstream)
+
+<!-- EP_RULES_END -->

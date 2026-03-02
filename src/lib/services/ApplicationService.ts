@@ -1,53 +1,26 @@
 import { SqlClient } from "@effect/sql";
 import { SqlError } from "@effect/sql/SqlError";
-import { Context, Effect, Layer, Schema } from "effect";
+import { DatabaseLayer } from "db/client";
+import { Effect, Schema } from "effect";
 import { ApplicationNotFoundError, ApplicationValidationError } from "~/lib/errors";
 import {
   Application,
   type ApplicationFilters,
   type ApplicationSort,
-  type ApplicationStats,
   type CreateApplication,
-  PaginatedResult,
   type UpdateApplication,
 } from "~/lib/schemas/application";
+import { PaginatedResult } from "~/lib/schemas/common";
 
 const decodeApplication = Schema.decodeUnknown(Application);
 
-export class ApplicationService extends Context.Tag("ApplicationService")<
-  ApplicationService,
-  {
-    readonly getAll: (
-      filters?: ApplicationFilters,
-      sort?: ApplicationSort,
-      page?: number,
-      pageSize?: number,
-    ) => Effect.Effect<PaginatedResult<typeof Application.Type>, SqlError>;
-    readonly getById: (
-      id: string,
-    ) => Effect.Effect<typeof Application.Type, ApplicationNotFoundError | SqlError>;
-    readonly create: (
-      data: typeof CreateApplication.Type,
-    ) => Effect.Effect<typeof Application.Type, ApplicationValidationError | SqlError>;
-    readonly update: (
-      id: string,
-      data: typeof UpdateApplication.Type,
-    ) => Effect.Effect<
-      typeof Application.Type,
-      ApplicationNotFoundError | ApplicationValidationError | SqlError
-    >;
-    readonly remove: (id: string) => Effect.Effect<void, ApplicationNotFoundError | SqlError>;
-    readonly getStats: () => Effect.Effect<ApplicationStats, SqlError>;
-  }
->() {}
-
-export const ApplicationServiceLive = Layer.effect(
-  ApplicationService,
-  Effect.gen(function* () {
+export class ApplicationService extends Effect.Service<ApplicationService>()("ApplicationService", {
+  dependencies: [DatabaseLayer],
+  effect: Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
 
     return {
-      getAll: (filters, sort, page = 1, pageSize = 20) =>
+      getAll: (filters?: ApplicationFilters, sort?: ApplicationSort, page = 1, pageSize = 20) =>
         Effect.gen(function* () {
           // Whitelist sort field/direction to prevent sql.unsafe injection
           const SORT_FIELDS: Record<string, string> = {
@@ -65,21 +38,21 @@ export const ApplicationServiceLive = Layer.effect(
           const searchFilter: string | null = filters?.search ? `%${filters.search}%` : null;
 
           const countResult = yield* sql`
-            SELECT count(*)::int as total FROM applications
-            WHERE (${statusFilter}::text IS NULL OR status = ${statusFilter})
-              AND (${searchFilter}::text IS NULL
-                   OR company ILIKE ${searchFilter}
-                   OR role ILIKE ${searchFilter})
-          `;
+              SELECT count(*)::int as total FROM applications
+              WHERE (${statusFilter}::text IS NULL OR status = ${statusFilter})
+                AND (${searchFilter}::text IS NULL
+                     OR company ILIKE ${searchFilter}
+                     OR role ILIKE ${searchFilter})
+            `;
           const rows = yield* sql`
-            SELECT * FROM applications
-            WHERE (${statusFilter}::text IS NULL OR status = ${statusFilter})
-              AND (${searchFilter}::text IS NULL
-                   OR company ILIKE ${searchFilter}
-                   OR role ILIKE ${searchFilter})
-            ORDER BY ${sql.unsafe(safeField)} ${sql.unsafe(safeDir)}
-            LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}
-          `;
+              SELECT * FROM applications
+              WHERE (${statusFilter}::text IS NULL OR status = ${statusFilter})
+                AND (${searchFilter}::text IS NULL
+                     OR company ILIKE ${searchFilter}
+                     OR role ILIKE ${searchFilter})
+              ORDER BY ${sql.unsafe(safeField)} ${sql.unsafe(safeDir)}
+              LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}
+            `;
 
           const total = (countResult[0]?.total as number) ?? 0;
           const items = yield* Effect.forEach(rows, (row) =>
@@ -97,7 +70,7 @@ export const ApplicationServiceLive = Layer.effect(
           return new PaginatedResult(items, total, page, pageSize);
         }),
 
-      getById: (id) =>
+      getById: (id: string) =>
         Effect.gen(function* () {
           const rows = yield* sql`SELECT * FROM applications WHERE id = ${id}`;
           if (rows.length === 0) {
@@ -114,7 +87,7 @@ export const ApplicationServiceLive = Layer.effect(
           );
         }),
 
-      create: (data) =>
+      create: (data: typeof CreateApplication.Type) =>
         Effect.gen(function* () {
           const appliedAt =
             data.status !== "draft" && !data.applied_at
@@ -122,10 +95,10 @@ export const ApplicationServiceLive = Layer.effect(
               : data.applied_at;
 
           const rows = yield* sql`
-            INSERT INTO applications (company, role, url, status, job_description, salary_range, location, platform, contact_name, contact_email, notes, applied_at, next_action, next_action_date)
-            VALUES (${data.company}, ${data.role}, ${data.url}, ${data.status}, ${data.job_description}, ${data.salary_range}, ${data.location}, ${data.platform}, ${data.contact_name}, ${data.contact_email}, ${data.notes}, ${appliedAt}, ${data.next_action}, ${data.next_action_date})
-            RETURNING *
-          `;
+              INSERT INTO applications (company, role, url, status, job_description, salary_range, location, platform, contact_name, contact_email, notes, applied_at, next_action, next_action_date)
+              VALUES (${data.company}, ${data.role}, ${data.url}, ${data.status}, ${data.job_description}, ${data.salary_range}, ${data.location}, ${data.platform}, ${data.contact_name}, ${data.contact_email}, ${data.notes}, ${appliedAt}, ${data.next_action}, ${data.next_action_date})
+              RETURNING *
+            `;
           return yield* decodeApplication(rows[0]).pipe(
             Effect.mapError(
               () =>
@@ -137,15 +110,8 @@ export const ApplicationServiceLive = Layer.effect(
           );
         }),
 
-      update: (id, data) =>
+      update: (id: string, data: typeof UpdateApplication.Type) =>
         Effect.gen(function* () {
-          // Check exists first
-          const existing = yield* sql`SELECT id FROM applications WHERE id = ${id}`;
-          if (existing.length === 0) {
-            return yield* new ApplicationNotFoundError({ id });
-          }
-
-          // Build SET clauses for provided fields
           const updates: Record<string, unknown> = {};
           if (data.company !== undefined) updates.company = data.company;
           if (data.role !== undefined) updates.role = data.role;
@@ -167,11 +133,15 @@ export const ApplicationServiceLive = Layer.effect(
           }
 
           const rows = yield* sql`
-            UPDATE applications
-            SET ${sql.update(updates)}, updated_at = now()
-            WHERE id = ${id}
-            RETURNING *
-          `;
+              UPDATE applications
+              SET ${sql.update(updates)}, updated_at = now()
+              WHERE id = ${id}
+              RETURNING *
+            `;
+
+          if (rows.length === 0) {
+            return yield* new ApplicationNotFoundError({ id });
+          }
 
           return yield* decodeApplication(rows[0]).pipe(
             Effect.mapError(
@@ -184,7 +154,7 @@ export const ApplicationServiceLive = Layer.effect(
           );
         }),
 
-      remove: (id) =>
+      remove: (id: string) =>
         Effect.gen(function* () {
           const rows = yield* sql`DELETE FROM applications WHERE id = ${id} RETURNING id`;
           if (rows.length === 0) {
@@ -196,10 +166,10 @@ export const ApplicationServiceLive = Layer.effect(
         Effect.gen(function* () {
           const totalResult = yield* sql`SELECT count(*)::int as total FROM applications`;
           const statusResult = yield* sql`
-            SELECT status, count(*)::int as count
-            FROM applications
-            GROUP BY status
-          `;
+              SELECT status, count(*)::int as count
+              FROM applications
+              GROUP BY status
+            `;
 
           const byStatus: Record<string, number> = {};
           for (const row of statusResult) {
@@ -211,6 +181,6 @@ export const ApplicationServiceLive = Layer.effect(
             byStatus,
           };
         }),
-    };
+    } as const;
   }),
-);
+}) {}

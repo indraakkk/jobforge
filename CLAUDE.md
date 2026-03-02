@@ -10,6 +10,7 @@ bun install          # Install dependencies
 bun test             # Run tests (bun:test)
 bun db:migrate       # Run database migrations
 bun db:seed          # Seed database with sample data
+bun patterns:update   # Update Effect patterns submodule
 docker compose up -d # Start PostgreSQL + MinIO
 ```
 
@@ -108,13 +109,22 @@ Read the relevant phase doc before implementing features:
 - `docs/phase-3-cv-manager.md` — CV upload + versioning
 - `docs/phase-4-ai-tailor.md` — AI-powered CV tailoring
 
+## Effect Patterns Reference
+
+Community Effect TS patterns live in `docs/effect-patterns/` (git submodule from [EffectPatterns](https://github.com/PaulJPhilp/EffectPatterns)):
+- **Browse**: `docs/effect-patterns/content/published/patterns/` — 16 categories with full code examples
+- **Update**: `bun patterns:update` — fetch latest patterns from upstream
+- **Categories**: error-management, schema, domain-modeling, concurrency, streams, testing, and more
+
+Use Serena memory (`mcp__serena`) for all project conventions and pattern references — not auto-memory MEMORY.md. When Effect patterns are updated via `bun patterns:update`, update relevant Serena memories (e.g. `conventions/effect-ts`) to reflect changes.
+
 ## Do NOT
 
 - Use Node.js APIs — use Bun equivalents
 - Use any ORM (Drizzle, Prisma, etc.) — use @effect/sql-pg
 - Use Zod for DB validation — use Effect Schema
 - Use try/catch — use Effect error channel
-- Use `process.env` — use Effect Config
+- Use `process.env` — use Effect Config (exception: Agent SDK subprocess env in `JobImportService`)
 - Use Effect in React components — keep it server-side
 - Use dotenv — Bun handles .env natively
 - Add features not in the current phase plan

@@ -20,6 +20,10 @@
         "--project",
         "/Users/indra/SaaS/jobforge"
       ]
+    },
+    "effect-mcp": {
+      "command": "bunx",
+      "args": ["effect-mcp@latest"]
     }
   }
 }

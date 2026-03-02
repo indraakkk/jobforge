@@ -34,7 +34,6 @@ const navItems = [
     title: "Q&A Vault",
     url: "/qa",
     icon: MessageSquare,
-    disabled: true,
   },
   {
     title: "CV Manager",

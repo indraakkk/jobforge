@@ -1,16 +1,7 @@
 import { Schema } from "effect";
+import { DateToString } from "~/lib/schemas/common";
 
-// pg driver returns Date objects for timestamptz/date columns
-const DateToString = Schema.transform(
-  Schema.Union(Schema.DateFromSelf, Schema.String),
-  Schema.String,
-  {
-    decode: (val) => (val instanceof Date ? val.toISOString() : val),
-    encode: (val) => val,
-  },
-);
-
-export const ApplicationStatus = Schema.Literal(
+export const APPLICATION_STATUS_VALUES = [
   "draft",
   "applied",
   "screening",
@@ -19,7 +10,9 @@ export const ApplicationStatus = Schema.Literal(
   "accepted",
   "rejected",
   "withdrawn",
-);
+] as const;
+
+export const ApplicationStatus = Schema.Literal(...APPLICATION_STATUS_VALUES);
 export type ApplicationStatus = typeof ApplicationStatus.Type;
 
 export class Application extends Schema.Class<Application>("Application")({
@@ -75,19 +68,6 @@ export class UpdateApplication extends Schema.Class<UpdateApplication>("UpdateAp
   next_action: Schema.optional(Schema.NullOr(Schema.String)),
   next_action_date: Schema.optional(Schema.NullOr(Schema.String)),
 }) {}
-
-export class PaginatedResult<T> {
-  constructor(
-    public readonly items: ReadonlyArray<T>,
-    public readonly total: number,
-    public readonly page: number,
-    public readonly pageSize: number,
-  ) {}
-
-  get totalPages(): number {
-    return Math.ceil(this.total / this.pageSize);
-  }
-}
 
 export interface ApplicationFilters {
   readonly status?: ApplicationStatus;
