@@ -13,10 +13,15 @@ function serializeCVFile(cv: CVFile & { variant_count?: number }) {
     file_size: cv.file_size,
     extracted_text: cv.extracted_text,
     is_base: cv.is_base,
+    is_active: cv.is_active,
     parent_id: cv.parent_id,
     version: cv.version,
     // biome-ignore lint/complexity/noBannedTypes: {} means any non-null JSON value, correct for jsonb metadata
     metadata: cv.metadata as Record<string, {}>,
+    tailoring_notes: cv.tailoring_notes,
+    target_job_description: cv.target_job_description,
+    target_company: cv.target_company,
+    target_role: cv.target_role,
     created_at: cv.created_at,
     updated_at: cv.updated_at,
     variant_count: cv.variant_count ?? 0,
@@ -24,6 +29,10 @@ function serializeCVFile(cv: CVFile & { variant_count?: number }) {
 }
 
 export type SerializedCVFile = ReturnType<typeof serializeCVFile>;
+
+export type VariantWithApplications = SerializedCVFile & {
+  linked_applications: Array<{ id: string; company: string; role: string }>;
+};
 
 export const uploadCV = createServerFn({ method: "POST" })
   .inputValidator((input: FormData) => input)
@@ -34,6 +43,10 @@ export const uploadCV = createServerFn({ method: "POST" })
       throw new Error("Missing required fields: file and name");
     }
     const parentId = (formData.get("parent_id") as string) || null;
+    const tailoringNotes = (formData.get("tailoring_notes") as string) || undefined;
+    const targetJobDescription = (formData.get("target_job_description") as string) || undefined;
+    const targetCompany = (formData.get("target_company") as string) || undefined;
+    const targetRole = (formData.get("target_role") as string) || undefined;
 
     const fileData = new Uint8Array(await file.arrayBuffer());
 
@@ -41,7 +54,12 @@ export const uploadCV = createServerFn({ method: "POST" })
       CVService.pipe(
         Effect.flatMap((svc) =>
           parentId
-            ? svc.uploadVariant(fileData, name, file.type, parentId)
+            ? svc.uploadVariant(fileData, name, file.type, parentId, {
+                tailoringNotes,
+                targetJobDescription,
+                targetCompany,
+                targetRole,
+              })
             : svc.uploadBase(fileData, name, file.type),
         ),
         Effect.map(serializeCVFile),
@@ -60,6 +78,23 @@ export const getCVFiles = createServerFn({ method: "GET" })
         Effect.provide(AppLive),
       ),
     );
+  });
+
+export const getCVVariantsWithApplications = createServerFn({ method: "GET" })
+  .inputValidator((input: { parentId: string }) => input)
+  .handler(async ({ data }): Promise<VariantWithApplications[]> => {
+    return Effect.runPromise(
+      CVService.pipe(
+        Effect.flatMap((svc) => svc.findVariantsWithApplications(data.parentId)),
+        Effect.map((items) =>
+          items.map((item) => ({
+            ...serializeCVFile(item),
+            linked_applications: item.linked_applications,
+          })),
+        ),
+        Effect.provide(AppLive),
+      ),
+    ) as Promise<VariantWithApplications[]>;
   });
 
 export const getCVFile = createServerFn({ method: "GET" })
@@ -86,12 +121,43 @@ export const getCVDownloadUrl = createServerFn({ method: "GET" })
     );
   });
 
+export const getCVFileData = createServerFn({ method: "GET" })
+  .inputValidator((input: { id: string }) => input)
+  .handler(async ({ data }) => {
+    return Effect.runPromise(
+      CVService.pipe(
+        Effect.flatMap((svc) =>
+          Effect.gen(function* () {
+            const cv = yield* svc.findById(data.id);
+            const bytes = yield* svc.download(data.id);
+            return {
+              data: Buffer.from(bytes).toString("base64"),
+              contentType: cv.file_type,
+            };
+          }),
+        ),
+        Effect.provide(AppLive),
+      ),
+    );
+  });
+
 export const deleteCV = createServerFn({ method: "POST" })
   .inputValidator((input: { id: string }) => input)
   .handler(async ({ data }) => {
     return Effect.runPromise(
       CVService.pipe(
         Effect.flatMap((svc) => svc.remove(data.id)),
+        Effect.provide(AppLive),
+      ),
+    );
+  });
+
+export const setCVActive = createServerFn({ method: "POST" })
+  .inputValidator((input: { id: string }) => input)
+  .handler(async ({ data }) => {
+    return Effect.runPromise(
+      CVService.pipe(
+        Effect.flatMap((svc) => svc.setActive(data.id)),
         Effect.provide(AppLive),
       ),
     );

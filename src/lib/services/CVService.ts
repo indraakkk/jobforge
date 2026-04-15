@@ -25,7 +25,18 @@ const decodeRow = (row: unknown) =>
 const ALLOWED_TYPES = [
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
 ];
+
+export interface UploadVariantOptions {
+  tailoringNotes?: string;
+  targetJobDescription?: string;
+  targetCompany?: string;
+  targetRole?: string;
+  metadata?: Record<string, unknown>;
+  /** Override extracted_text (used for AI-generated variants where text is the primary content) */
+  extractedTextOverride?: string;
+}
 
 export class CVService extends Effect.Service<CVService>()("CVService", {
   dependencies: [DatabaseLayer, StorageServiceLive, TextExtractionServiceLive],
@@ -69,7 +80,7 @@ export class CVService extends Effect.Service<CVService>()("CVService", {
         fileName: string,
         fileType: string,
         parentId: string,
-        metadata: Record<string, unknown> = {},
+        options: UploadVariantOptions = {},
       ) =>
         Effect.gen(function* () {
           if (!ALLOWED_TYPES.includes(fileType)) {
@@ -94,18 +105,33 @@ export class CVService extends Effect.Service<CVService>()("CVService", {
           const fileKey = `variants/${parentId}/${crypto.randomUUID()}/${fileName}`;
           yield* storage.upload(fileKey, fileData, fileType);
 
-          // Soft-fail text extraction
-          const extracted: string | null = yield* extractor
-            .extract(fileData, fileType)
-            .pipe(Effect.catchTag("ExtractionError", () => Effect.succeed(null as string | null)));
+          // Use extractedTextOverride if provided (e.g. AI-generated variants), else extract
+          const extracted: string | null =
+            options.extractedTextOverride !== undefined
+              ? options.extractedTextOverride
+              : yield* extractor
+                  .extract(fileData, fileType)
+                  .pipe(
+                    Effect.catchTag("ExtractionError", () => Effect.succeed(null as string | null)),
+                  );
+
+          const metadata = options.metadata ?? {};
+          const tailoringNotes = options.tailoringNotes ?? null;
+          const targetJobDescription = options.targetJobDescription ?? null;
+          const targetCompany = options.targetCompany ?? null;
+          const targetRole = options.targetRole ?? null;
 
           // Compute version atomically in INSERT to avoid race conditions
           const rows = yield* sql`
-            INSERT INTO cv_files (name, file_key, file_type, file_size, extracted_text, is_base, parent_id, version, metadata)
+            INSERT INTO cv_files (
+              name, file_key, file_type, file_size, extracted_text, is_base, parent_id, version,
+              metadata, tailoring_notes, target_job_description, target_company, target_role
+            )
             VALUES (
               ${fileName}, ${fileKey}, ${fileType}, ${fileData.length}, ${extracted}, false, ${parentId},
               (SELECT COALESCE(MAX(version), 0) + 1 FROM cv_files WHERE parent_id = ${parentId}),
-              ${JSON.stringify(metadata)}::jsonb
+              ${JSON.stringify(metadata)}::jsonb,
+              ${tailoringNotes}, ${targetJobDescription}, ${targetCompany}, ${targetRole}
             )
             RETURNING *
           `;
@@ -147,6 +173,47 @@ export class CVService extends Effect.Service<CVService>()("CVService", {
             SELECT * FROM cv_files WHERE parent_id = ${parentId} ORDER BY version DESC
           `;
           return yield* Effect.forEach(rows, decodeRow);
+        }),
+
+      findVariantsWithApplications: (parentId: string) =>
+        Effect.gen(function* () {
+          const rows = yield* sql`
+            SELECT * FROM cv_files WHERE parent_id = ${parentId} ORDER BY version DESC
+          `;
+          const variants = yield* Effect.forEach(rows, decodeRow);
+          // For each variant, fetch linked applications
+          const result = yield* Effect.forEach(variants, (variant) =>
+            Effect.gen(function* () {
+              const appRows = yield* sql`
+                SELECT a.id, a.company, a.role FROM applications a
+                INNER JOIN application_cv ac ON ac.application_id = a.id
+                WHERE ac.cv_file_id = ${variant.id}
+                ORDER BY a.company
+              `;
+              return {
+                ...variant,
+                linked_applications: appRows as unknown as Array<{ id: string; company: string; role: string }>,
+              };
+            }),
+          );
+          return result;
+        }),
+
+      setActive: (id: string) =>
+        Effect.gen(function* () {
+          // Verify the CV exists and is a base CV
+          const rows = yield* sql`SELECT id, is_base FROM cv_files WHERE id = ${id}`;
+          if (rows.length === 0) {
+            return yield* new CVNotFoundError({ id });
+          }
+          if (!rows[0].is_base) {
+            return yield* new CVValidationError({
+              message: "Only base CVs can be set as active",
+            });
+          }
+          // Deactivate all base CVs, then activate this one
+          yield* sql`UPDATE cv_files SET is_active = false WHERE is_base = true`;
+          yield* sql`UPDATE cv_files SET is_active = true WHERE id = ${id}`;
         }),
 
       linkToApplication: (cvId: string, applicationId: string) =>

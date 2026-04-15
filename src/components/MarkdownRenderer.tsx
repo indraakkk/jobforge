@@ -6,8 +6,14 @@ interface Props {
 
 export function MarkdownRenderer({ content }: Props) {
   return (
-    <div data-color-mode="light">
-      <MDEditor.Markdown source={content} style={{ background: "transparent", color: "inherit" }} />
+    <div data-color-mode="light" className="markdown-render-sm">
+      <MDEditor.Markdown
+        source={content}
+        style={{
+          background: "transparent",
+          color: "inherit",
+        }}
+      />
     </div>
   );
 }

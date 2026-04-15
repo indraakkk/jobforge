@@ -96,9 +96,15 @@ export const StorageServiceLive = Layer.effect(
       getUrl: (key: string) =>
         Effect.tryPromise({
           try: () =>
-            getSignedUrl(client, new GetObjectCommand({ Bucket: BUCKET, Key: key }), {
-              expiresIn: 3600,
-            }),
+            getSignedUrl(
+              client,
+              new GetObjectCommand({
+                Bucket: BUCKET,
+                Key: key,
+                ResponseContentDisposition: "inline",
+              }),
+              { expiresIn: 3600 },
+            ),
           catch: (error: unknown) =>
             new StorageError({ message: `Presigned URL failed: ${error}`, cause: error }),
         }),

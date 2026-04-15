@@ -1,5 +1,5 @@
 import { TanStackDevtools } from "@tanstack/react-devtools";
-import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Link, Outlet, Scripts } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Separator } from "@/components/ui/separator";
@@ -10,6 +10,7 @@ import appCss from "~/styles/app.css?url";
 export const Route = createRootRoute({
   shellComponent: RootDocument,
   component: RootComponent,
+  notFoundComponent: NotFound,
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -39,6 +40,24 @@ function RootComponent() {
         </SidebarInset>
       </SidebarProvider>
     </TooltipProvider>
+  );
+}
+
+function NotFound() {
+  return (
+    <div className="flex flex-col items-center justify-center py-24 text-center">
+      <p className="text-6xl font-bold text-muted-foreground/30">404</p>
+      <p className="mt-4 text-lg font-medium text-foreground">Page not found</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        The page you're looking for doesn't exist.
+      </p>
+      <Link
+        to="/"
+        className="mt-6 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
+      >
+        Go home
+      </Link>
+    </div>
   );
 }
 

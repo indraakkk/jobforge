@@ -1,10 +1,37 @@
-{ pkgs, ... }:
+{ pkgs, config, ... }:
 
 {
   packages = [
     pkgs.bun
     pkgs.uv
   ];
+
+  # DNS: resolve jobforge.test to localhost
+  hosts."jobforge.test" = "127.0.0.1";
+
+  # TLS: generate trusted local certificate via mkcert
+  certificates = [
+    "jobforge.test"
+  ];
+
+  # Reverse proxy: Caddy terminates TLS, proxies to Vite/built app
+  services.caddy = {
+    enable = true;
+    config = ''
+      https://jobforge.test:8443 {
+        tls ${config.env.DEVENV_STATE}/mkcert/jobforge.test.pem ${config.env.DEVENV_STATE}/mkcert/jobforge.test-key.pem
+        reverse_proxy localhost:3000 {
+          transport http {
+            read_timeout 300s
+            write_timeout 300s
+          }
+        }
+      }
+    '';
+  };
+
+  # Claude CLI proxy: standalone Bun server for subprocess spawning
+  processes.claude-proxy.exec = "bun run scripts/claude-proxy.ts";
 
   services.postgres = {
     enable = true;
@@ -32,15 +59,18 @@
   enterShell = ''
     echo "JobForge development environment ready!"
     echo ""
-    echo "Available tools:"
-    echo "  - bun $(bun --version)"
-    echo "  - postgres (service auto-starts on port 5455)"
+    echo "Services (start with 'devenv up' in another terminal):"
+    echo "  - postgres on port 5455"
+    echo "  - caddy on port 8443 (reverse proxy to localhost:3000)"
+    echo "  - claude-proxy on port 3001 (Claude CLI bridge)"
     echo ""
     echo "Commands:"
-    echo "  - dev: Start development server"
+    echo "  - dev: Start Vite dev server (port 3000)"
     echo "  - build: Build for production"
     echo "  - bun db:migrate: Run database migrations"
     echo "  - bun db:seed: Seed sample data"
     echo "  - docker compose up -d: Start MinIO"
+    echo ""
+    echo "Access: https://jobforge.test:8443"
   '';
 }

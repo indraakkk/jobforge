@@ -1,4 +1,5 @@
 import { Layer } from "effect";
+import { AIService } from "~/lib/services/AIService";
 import { ApplicationService } from "~/lib/services/ApplicationService";
 import { CVService } from "~/lib/services/CVService";
 import { JobImportService } from "~/lib/services/JobImportService";
@@ -9,4 +10,5 @@ export const AppLive = Layer.mergeAll(
   QAService.Default,
   JobImportService.Default,
   CVService.Default,
+  AIService.Default,
 );

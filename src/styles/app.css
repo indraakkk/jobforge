@@ -199,3 +199,31 @@
     font-family: var(--font-mono);
   }
 }
+
+/* Scoped markdown render — matches text-sm (0.875rem) used across the app */
+.markdown-render-sm .wmde-markdown,
+.markdown-render-sm .wmde-markdown-var {
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.markdown-render-sm .wmde-markdown h1 { font-size: 1.125rem; }
+.markdown-render-sm .wmde-markdown h2 { font-size: 1rem; }
+.markdown-render-sm .wmde-markdown h3 { font-size: 0.9375rem; }
+.markdown-render-sm .wmde-markdown h4,
+.markdown-render-sm .wmde-markdown h5,
+.markdown-render-sm .wmde-markdown h6 { font-size: 0.875rem; }
+
+.markdown-render-sm .wmde-markdown p,
+.markdown-render-sm .wmde-markdown li,
+.markdown-render-sm .wmde-markdown td,
+.markdown-render-sm .wmde-markdown th,
+.markdown-render-sm .wmde-markdown blockquote { font-size: 0.875rem; }
+
+.markdown-render-sm .wmde-markdown code { font-size: 0.8125rem; }
+
+/* Restore list styles stripped by Tailwind's CSS reset */
+.markdown-render-sm .wmde-markdown ul { list-style-type: disc; padding-left: 1.5em; }
+.markdown-render-sm .wmde-markdown ol { list-style-type: decimal; padding-left: 1.5em; }
+.markdown-render-sm .wmde-markdown ul ul { list-style-type: circle; }
+.markdown-render-sm .wmde-markdown ul ul ul { list-style-type: square; }

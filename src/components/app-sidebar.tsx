@@ -42,9 +42,8 @@ const navItems = [
   },
   {
     title: "AI Tailor",
-    url: "/ai",
+    url: "/cv/tailor",
     icon: Sparkles,
-    disabled: true,
   },
 ];
 

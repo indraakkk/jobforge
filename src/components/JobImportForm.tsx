@@ -49,8 +49,7 @@ export function JobImportForm() {
     setSelectedQuestions(qs);
   }
 
-  async function handleImport(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleImport() {
     if (!url.trim()) return;
     setImporting(true);
     setError(null);
@@ -171,25 +170,25 @@ export function JobImportForm() {
       )}
 
       {/* URL input */}
-      <form onSubmit={handleImport} className="flex gap-3">
+      <div className="flex gap-3">
         <div className="flex-1">
           <label htmlFor="import-url" className={labelClass}>
             Job Posting URL
           </label>
           <input
             id="import-url"
-            type="url"
+            type="text"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://jobs.ashbyhq.com/company/position..."
             className={inputClass}
-            required
             disabled={importing}
           />
         </div>
         <div className="flex items-end">
           <button
-            type="submit"
+            type="button"
+            onClick={handleImport}
             disabled={importing || !url.trim()}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
           >
@@ -203,7 +202,7 @@ export function JobImportForm() {
             )}
           </button>
         </div>
-      </form>
+      </div>
 
       {importing && (
         <div className="rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground flex items-center gap-2">

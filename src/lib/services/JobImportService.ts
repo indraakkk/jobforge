@@ -1,36 +1,32 @@
-import { query } from "@anthropic-ai/claude-agent-sdk";
-import { Effect } from "effect";
-import { z } from "zod/v4";
+import { Effect, Schema } from "effect";
 import { JobImportError } from "~/lib/errors/jobImport";
+import { JobImportResult } from "~/lib/schemas/jobImport";
+import { ClaudeCliLayer, ClaudeCliService } from "~/lib/services/ClaudeCliService";
 
-export const JobImportResult = z.object({
-  company: z.string().describe("Company name"),
-  role: z.string().describe("Job title/role"),
-  location: z.string().optional().describe("Job location (e.g. Remote, NYC, etc.)"),
-  salary: z.string().optional().describe("Salary range if mentioned in the posting"),
-  platform: z
-    .string()
-    .optional()
-    .describe("Job board platform name (e.g. Ashby, Lever, Greenhouse)"),
-  description: z.string().describe("Full job description converted to clean markdown format"),
-  questions: z.array(z.string()).describe("Application questions found in the job posting form"),
-  url: z.string().describe("The original job posting URL"),
-});
+export { JobImportResult } from "~/lib/schemas/jobImport";
 
-export type JobImportResult = z.infer<typeof JobImportResult>;
+const decodeResult = Schema.decodeUnknown(JobImportResult);
+
+const SYSTEM_PROMPT = `You are a job posting extraction assistant. You MUST respond with ONLY a valid JSON object (no markdown, no code blocks, just raw JSON) matching this schema:
+{
+  "company": "string (required)",
+  "role": "string (required)",
+  "location": "string (optional, omit if not found)",
+  "salary": "string (optional, omit if not found)",
+  "platform": "string (optional, e.g. Ashby, Lever, Greenhouse)",
+  "description": "string (required, full markdown-formatted job description)",
+  "questions": ["string array of application form questions"],
+  "url": "string (required, the original URL)"
+}`;
 
 export class JobImportService extends Effect.Service<JobImportService>()("JobImportService", {
-  succeed: {
-    importFromUrl: (url: string) =>
-      Effect.tryPromise({
-        try: async () => {
-          // NOTE: process.env used intentionally — Agent SDK requires a plain env object.
-          const cleanEnv = { ...process.env };
-          delete (cleanEnv as Record<string, unknown>).CLAUDECODE;
+  dependencies: [ClaudeCliLayer],
+  effect: Effect.gen(function* () {
+    const claude = yield* ClaudeCliService;
 
-          const jsonSchema = z.toJSONSchema(JobImportResult) as Record<string, unknown>;
-          delete jsonSchema.$schema;
-
+    return {
+      importFromUrl: (url: string) =>
+        Effect.gen(function* () {
           const prompt = `Visit this job posting URL and extract all relevant information: ${url}
 
 Fetch the page using WebFetch and extract:
@@ -44,38 +40,47 @@ Fetch the page using WebFetch and extract:
 
 Return the URL as-is in the url field.
 For the description, use proper markdown formatting with headers, lists, bold text, etc.
-If you can't find certain optional fields, omit them.`;
+If you can't find certain optional fields, omit them.
+Return ONLY valid JSON, no markdown code blocks.`;
 
-          const conversation = query({
-            prompt,
-            options: {
-              tools: ["WebFetch"],
-              outputFormat: { type: "json_schema", schema: jsonSchema },
-              permissionMode: "bypassPermissions",
-              allowDangerouslySkipPermissions: true,
-              maxTurns: 10,
-              model: "sonnet",
-              persistSession: false,
-              env: cleanEnv,
+          const response = yield* claude
+            .ask(prompt, {
+              systemPrompt: SYSTEM_PROMPT,
+              allowedTools: ["WebFetch"],
+              dangerouslySkipPermissions: true,
+              maxBudgetUsd: 1,
+            })
+            .pipe(
+              Effect.mapError(
+                (e) => new JobImportError({ url, message: `Claude CLI error: ${e.message}` }),
+              ),
+            );
+
+          const parsed = yield* Effect.try({
+            try: () => {
+              const cleaned = response.result
+                .replace(/^```(?:json)?\s*/i, "")
+                .replace(/\s*```\s*$/, "")
+                .trim();
+              return JSON.parse(cleaned);
             },
+            catch: (e) =>
+              new JobImportError({
+                url,
+                message: `Failed to parse job import result: ${e}`,
+              }),
           });
 
-          for await (const message of conversation) {
-            if (message.type === "result" && message.subtype === "success") {
-              const parsed = JobImportResult.safeParse(message.structured_output);
-              if (parsed.success) {
-                return parsed.data;
-              }
-              throw new Error(`Schema validation failed: ${JSON.stringify(parsed.error)}`);
-            }
-          }
-          throw new Error("Agent returned no result");
-        },
-        catch: (error) =>
-          new JobImportError({
-            url,
-            message: error instanceof Error ? error.message : String(error),
-          }),
-      }),
-  },
+          return yield* decodeResult(parsed).pipe(
+            Effect.mapError(
+              (e) =>
+                new JobImportError({
+                  url,
+                  message: `Job import result validation failed: ${String(e)}`,
+                }),
+            ),
+          );
+        }),
+    };
+  }),
 }) {}

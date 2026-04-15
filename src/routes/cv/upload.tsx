@@ -23,8 +23,14 @@ function UploadCV() {
   const [name, setName] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [parentId, setParentId] = useState(search.parent);
+  const [tailoringNotes, setTailoringNotes] = useState("");
+  const [targetJobDescription, setTargetJobDescription] = useState("");
+  const [targetCompany, setTargetCompany] = useState("");
+  const [targetRole, setTargetRole] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+
+  const isVariant = Boolean(parentId);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const selected = e.target.files?.[0];
@@ -63,6 +69,10 @@ function UploadCV() {
       formData.append("name", name);
       if (parentId) {
         formData.append("parent_id", parentId);
+        if (tailoringNotes) formData.append("tailoring_notes", tailoringNotes);
+        if (targetJobDescription) formData.append("target_job_description", targetJobDescription);
+        if (targetCompany) formData.append("target_company", targetCompany);
+        if (targetRole) formData.append("target_role", targetRole);
       }
 
       const result = (await uploadCV({ data: formData })) as SerializedCVFile;
@@ -75,7 +85,9 @@ function UploadCV() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-foreground tracking-tight">Upload CV</h1>
+      <h1 className="text-2xl font-bold text-foreground tracking-tight">
+        {isVariant ? "Upload CV Variant" : "Upload CV"}
+      </h1>
 
       <form onSubmit={handleSubmit} className="max-w-lg space-y-5">
         {/* File drop zone */}
@@ -136,13 +148,13 @@ function UploadCV() {
           />
         </div>
 
-        {/* Parent CV (optional — for variants) */}
+        {/* Parent CV (optional - for variants) */}
         {baseCVs.length > 0 && (
           <div>
             <label htmlFor="parent-cv" className="mb-1.5 block text-sm font-medium text-foreground">
               Base CV{" "}
               <span className="font-normal text-muted-foreground">
-                (optional — creates variant)
+                (optional - creates variant)
               </span>
             </label>
             <select
@@ -151,7 +163,7 @@ function UploadCV() {
               onChange={(e) => setParentId(e.target.value)}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
             >
-              <option value="">None — upload as base CV</option>
+              <option value="">None - upload as base CV</option>
               {baseCVs.map((cv) => (
                 <option key={cv.id} value={cv.id}>
                   {cv.name}
@@ -159,6 +171,92 @@ function UploadCV() {
               ))}
             </select>
           </div>
+        )}
+
+        {/* Tailoring metadata - only shown when creating a variant */}
+        {isVariant && (
+          <>
+            <hr className="border-border" />
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Tailoring Details
+            </p>
+
+            {/* Target Company */}
+            <div>
+              <label
+                htmlFor="target-company"
+                className="mb-1.5 block text-sm font-medium text-foreground"
+              >
+                Target Company{" "}
+                <span className="font-normal text-muted-foreground">(optional)</span>
+              </label>
+              <input
+                id="target-company"
+                type="text"
+                value={targetCompany}
+                onChange={(e) => setTargetCompany(e.target.value)}
+                placeholder="e.g. Acme Corp"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground shadow-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
+              />
+            </div>
+
+            {/* Target Role */}
+            <div>
+              <label
+                htmlFor="target-role"
+                className="mb-1.5 block text-sm font-medium text-foreground"
+              >
+                Target Role{" "}
+                <span className="font-normal text-muted-foreground">(optional)</span>
+              </label>
+              <input
+                id="target-role"
+                type="text"
+                value={targetRole}
+                onChange={(e) => setTargetRole(e.target.value)}
+                placeholder="e.g. Senior Software Engineer"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground shadow-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring transition-colors"
+              />
+            </div>
+
+            {/* Tailoring Notes */}
+            <div>
+              <label
+                htmlFor="tailoring-notes"
+                className="mb-1.5 block text-sm font-medium text-foreground"
+              >
+                Tailoring Notes{" "}
+                <span className="font-normal text-muted-foreground">(optional)</span>
+              </label>
+              <textarea
+                id="tailoring-notes"
+                value={tailoringNotes}
+                onChange={(e) => setTailoringNotes(e.target.value)}
+                placeholder="What did you change? e.g. Emphasized backend skills, added relevant projects..."
+                rows={3}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground shadow-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring transition-colors resize-none"
+              />
+            </div>
+
+            {/* Target Job Description */}
+            <div>
+              <label
+                htmlFor="target-jd"
+                className="mb-1.5 block text-sm font-medium text-foreground"
+              >
+                Target Job Description{" "}
+                <span className="font-normal text-muted-foreground">(optional)</span>
+              </label>
+              <textarea
+                id="target-jd"
+                value={targetJobDescription}
+                onChange={(e) => setTargetJobDescription(e.target.value)}
+                placeholder="Paste the job description you tailored this CV for..."
+                rows={5}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground shadow-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring transition-colors resize-none"
+              />
+            </div>
+          </>
         )}
 
         {error && <p className="text-sm text-destructive">{error}</p>}

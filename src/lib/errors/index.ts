@@ -1,3 +1,10 @@
+export { AIError, AISessionNotFoundError } from "./ai";
+export {
+  ClaudeExitError,
+  ClaudeParseError,
+  ClaudeSpawnError,
+  ClaudeTimeoutError,
+} from "./claude";
 export { ApplicationNotFoundError, ApplicationValidationError } from "./application";
 export { CVNotFoundError, CVValidationError, ExtractionError } from "./cv";
 export { DatabaseError } from "./database";

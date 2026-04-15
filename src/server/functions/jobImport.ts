@@ -47,5 +47,5 @@ export const importJobFromUrl = createServerFn({ method: "POST" })
       ),
     );
 
-    return { type: "ok", data: result };
+    return { type: "ok", data: { ...result } };
   });
