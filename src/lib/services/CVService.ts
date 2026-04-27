@@ -192,7 +192,11 @@ export class CVService extends Effect.Service<CVService>()("CVService", {
               `;
               return {
                 ...variant,
-                linked_applications: appRows as unknown as Array<{ id: string; company: string; role: string }>,
+                linked_applications: appRows as unknown as Array<{
+                  id: string;
+                  company: string;
+                  role: string;
+                }>,
               };
             }),
           );

@@ -11,4 +11,3 @@ export class AISessionNotFoundError extends Schema.TaggedError<AISessionNotFound
     id: Schema.String,
   },
 ) {}
-

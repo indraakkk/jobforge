@@ -135,6 +135,94 @@ export class AIService extends Effect.Service<AIService>()("AIService", {
           return { session: updatedSession, analysis };
         }),
 
+      /**
+       * Prepare a streaming session: validates the CV, builds prompts,
+       * inserts a pending ai_session row. Returns everything the browser
+       * needs to open the SSE stream against the same-origin
+       * `/api/ai/stream` route.
+       *
+       * Pairs with `finalizeStreamingSession` once the stream completes.
+       */
+      prepareStreamingSession: (baseCvId: string, jobDescription: string, applicationId?: string) =>
+        Effect.gen(function* () {
+          const cvRows = yield* sql`
+            SELECT id, extracted_text FROM cv_files WHERE id = ${baseCvId} AND is_base = true
+          `;
+          if (cvRows.length === 0) {
+            return yield* new CVNotFoundError({ id: baseCvId });
+          }
+          const cvText = (cvRows[0].extracted_text as string | null) ?? "";
+          if (!cvText.trim()) {
+            return yield* new AIError({
+              message:
+                "This CV has no extracted text. Please re-upload or ensure text extraction succeeded.",
+            });
+          }
+
+          const systemPrompt = buildSystemPrompt();
+          const userPrompt = buildUserPrompt(cvText, jobDescription);
+          const appIdValue = applicationId ?? null;
+          const modelUsed = "sonnet";
+
+          const sessionRows = yield* sql`
+            INSERT INTO ai_sessions (base_cv_id, application_id, job_description_input, prompt_used, model_used, status)
+            VALUES (${baseCvId}, ${appIdValue}, ${jobDescription}, ${`${systemPrompt}\n\n${userPrompt}`}, ${modelUsed}, 'pending')
+            RETURNING *
+          `;
+          const session = yield* decodeRow(sessionRows[0]);
+
+          return {
+            session,
+            systemPrompt,
+            userPrompt,
+            model: modelUsed,
+          };
+        }),
+
+      /**
+       * Finalize a streaming session: parses the raw text accumulated by the
+       * browser, persists tokens, and returns the structured analysis.
+       */
+      finalizeStreamingSession: (
+        sessionId: string,
+        rawResponse: string,
+        inputTokens: number,
+        outputTokens: number,
+      ) =>
+        Effect.gen(function* () {
+          const analysis = yield* Effect.try({
+            try: () => {
+              const cleaned = rawResponse
+                .replace(/^```(?:json)?\s*/i, "")
+                .replace(/\s*```\s*$/, "")
+                .trim();
+              return JSON.parse(cleaned) as AIAnalysisResult;
+            },
+            catch: (e) =>
+              new AIError({
+                message: "Failed to parse streamed AI response as JSON",
+                cause: e,
+              }),
+          });
+
+          yield* sql`
+            UPDATE ai_sessions
+            SET
+              status = 'completed',
+              ai_response = ${rawResponse},
+              input_tokens = ${inputTokens},
+              output_tokens = ${outputTokens}
+            WHERE id = ${sessionId}
+          `;
+
+          const updatedRows = yield* sql`SELECT * FROM ai_sessions WHERE id = ${sessionId}`;
+          if (updatedRows.length === 0) {
+            return yield* new AISessionNotFoundError({ id: sessionId });
+          }
+          const session = yield* decodeRow(updatedRows[0]);
+          return { session, analysis };
+        }),
+
       acceptSession: (sessionId: string, cvVariantId: string) =>
         Effect.gen(function* () {
           yield* sql`

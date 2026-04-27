@@ -1,15 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  Brain,
-  CheckCircle,
-  ChevronRight,
-  Clock,
-  Sparkles,
-  XCircle,
-} from "lucide-react";
-import { useState } from "react";
+import { Brain, CheckCircle, ChevronRight, Clock, Sparkles, XCircle } from "lucide-react";
+import { useRef, useState } from "react";
 import type { AIAnalysisResult } from "~/lib/schemas/aiSession";
-import { type AITailorResponse, acceptAISession, analyzeCV } from "~/server/functions/ai";
+import type { ClaudeStreamEvent } from "~/lib/schemas/claudeStream";
+import { acceptAISession, finalizeAIStream, prepareAIStream } from "~/server/functions/ai";
 import { getCVFiles, type SerializedCVFile } from "~/server/functions/cv";
 
 export const Route = createFileRoute("/cv/tailor/")({
@@ -34,6 +28,11 @@ function AITailorPage() {
   const [analysis, setAnalysis] = useState<AIAnalysisResult | null>(null);
   const [editedCV, setEditedCV] = useState("");
 
+  // Live token stream from the Claude CLI subprocess (rendered while the agent
+  // works). Replaced by the parsed `analysis.suggestedCV` once finalize lands.
+  const [streamingText, setStreamingText] = useState("");
+  const abortRef = useRef<AbortController | null>(null);
+
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [savedVariantId, setSavedVariantId] = useState<string | null>(null);
@@ -49,24 +48,137 @@ function AITailorPage() {
     setAnalysis(null);
     setSessionId(null);
     setSaved(false);
+    setStreamingText("");
+
+    const abort = new AbortController();
+    abortRef.current = abort;
 
     try {
-      const result: AITailorResponse = await analyzeCV({
+      // 1. Prepare: server validates CV, builds prompts, inserts pending session.
+      const prep = await prepareAIStream({
         data: { baseCvId, jobDescription },
       });
-
-      if ("error" in result && result.error) {
-        setError(result.error);
-      } else if ("analysis" in result && result.analysis) {
-        setSessionId(result.sessionId);
-        setAnalysis(result.analysis);
-        setEditedCV(result.analysis.suggestedCV);
+      if (!prep.ok) {
+        setError(prep.error);
+        return;
       }
+      setSessionId(prep.sessionId);
+
+      // 2. Open SSE stream against the same-origin API route, which spawns
+      // the user's local `claude` binary inline.
+      const res = await fetch("/api/ai/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: prep.userPrompt,
+          options: {
+            systemPrompt: prep.systemPrompt,
+            model: prep.model,
+            tools: "",
+          },
+        }),
+        signal: abort.signal,
+      });
+      if (!res.ok || !res.body) {
+        setError(`Streaming failed: HTTP ${res.status}`);
+        return;
+      }
+
+      let rawText = "";
+      let inputTokens = 0;
+      let outputTokens = 0;
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      streamLoop: while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        // SSE frames are separated by a blank line.
+        let frameEnd = buffer.indexOf("\n\n");
+        while (frameEnd !== -1) {
+          const frame = buffer.slice(0, frameEnd);
+          buffer = buffer.slice(frameEnd + 2);
+          frameEnd = buffer.indexOf("\n\n");
+
+          let eventName = "message";
+          const dataLines: string[] = [];
+          for (const line of frame.split("\n")) {
+            if (line.startsWith("event:")) eventName = line.slice(6).trim();
+            else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+          }
+          const dataStr = dataLines.join("\n");
+
+          if (eventName === "done") break streamLoop;
+          if (eventName === "error") {
+            setError(`Claude proxy error: ${dataStr.slice(0, 300)}`);
+            break streamLoop;
+          }
+
+          let ev: ClaudeStreamEvent;
+          try {
+            ev = JSON.parse(dataStr) as ClaudeStreamEvent;
+          } catch {
+            continue;
+          }
+
+          // Token-level streaming arrives as content_block_delta. Accumulate
+          // text deltas live so the user sees the model thinking.
+          if (ev.type === "stream_event") {
+            const sub = ev.event;
+            if (sub.type === "content_block_delta" && sub.delta.type === "text_delta") {
+              rawText += sub.delta.text;
+              setStreamingText(rawText);
+            } else if (sub.type === "message_delta" && sub.usage) {
+              if (sub.usage.input_tokens) inputTokens = sub.usage.input_tokens;
+              if (sub.usage.output_tokens) outputTokens = sub.usage.output_tokens;
+            }
+          } else if (ev.type === "result") {
+            // The result event carries the canonical full text + final usage.
+            // Trust this over our accumulated deltas (handles edge cases like
+            // the CLI compressing whitespace or omitting partial frames).
+            rawText = ev.result;
+            inputTokens = ev.usage.input_tokens;
+            outputTokens = ev.usage.output_tokens;
+            setStreamingText(rawText);
+          }
+        }
+      }
+
+      if (!rawText.trim()) {
+        setError("No response received from Claude");
+        return;
+      }
+
+      // 3. Finalize: server parses the JSON, persists tokens, returns analysis.
+      const fin = await finalizeAIStream({
+        data: {
+          sessionId: prep.sessionId,
+          rawResponse: rawText,
+          inputTokens,
+          outputTokens,
+        },
+      });
+      if (!fin.ok) {
+        setError(fin.error);
+        return;
+      }
+      setAnalysis(fin.analysis);
+      setEditedCV(fin.analysis.suggestedCV);
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Analysis failed");
     } finally {
       setAnalyzing(false);
+      abortRef.current = null;
     }
+  }
+
+  function handleCancel() {
+    abortRef.current?.abort();
   }
 
   async function handleAccept() {
@@ -184,24 +296,38 @@ function AITailorPage() {
 
               {error && <p className="text-sm text-destructive">{error}</p>}
 
-              <button
-                type="button"
-                onClick={handleAnalyze}
-                disabled={analyzing || !baseCvId || !jobDescription.trim()}
-                className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {analyzing ? (
-                  <>
+              {analyzing ? (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled
+                    data-testid="tailor-analyzing"
+                    className="flex-1 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
                     <span className="inline-block size-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                    Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="size-4" />
-                    Analyze
-                  </>
-                )}
-              </button>
+                    Streaming...
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancel}
+                    data-testid="tailor-cancel"
+                    className="rounded-md border border-border bg-card px-4 py-2 text-sm font-medium text-foreground shadow-sm hover:bg-accent transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleAnalyze}
+                  disabled={!baseCvId || !jobDescription.trim()}
+                  data-testid="tailor-analyze"
+                  className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <Sparkles className="size-4" />
+                  Analyze
+                </button>
+              )}
             </div>
           </div>
 
@@ -217,16 +343,28 @@ function AITailorPage() {
             )}
 
             {analyzing && (
-              <div className="rounded-lg border border-border bg-card p-12 text-center flex flex-col items-center justify-center gap-3">
-                <div className="size-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-                <p className="text-sm text-muted-foreground">
-                  AI is analyzing your CV against the job description...
-                </p>
+              <div
+                className="rounded-lg border border-border bg-card p-5 space-y-3"
+                data-testid="tailor-stream-panel"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="size-4 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+                  <p className="text-sm font-medium text-foreground">Claude is streaming...</p>
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    {streamingText.length} chars
+                  </span>
+                </div>
+                <pre
+                  data-testid="tailor-stream-output"
+                  className="max-h-[60vh] overflow-auto rounded-md bg-muted/40 p-3 text-xs font-mono text-foreground whitespace-pre-wrap break-words"
+                >
+                  {streamingText || "(waiting for first token…)"}
+                </pre>
               </div>
             )}
 
             {analysis && !analyzing && (
-              <div className="space-y-4">
+              <div className="space-y-4" data-testid="tailor-analysis">
                 {/* Match score + summary */}
                 <div className="rounded-lg border border-border bg-card p-5 space-y-4">
                   <div className="flex items-center justify-between">

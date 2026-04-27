@@ -25,10 +25,10 @@ import {
   getCVFile,
   getCVVariantsWithApplications,
   linkCVToApplication,
-  setCVActive,
   type SerializedCVFile,
-  type VariantWithApplications,
+  setCVActive,
   unlinkCVFromApplication,
+  type VariantWithApplications,
 } from "~/server/functions/cv";
 
 export const Route = createFileRoute("/cv/$id/")({
@@ -108,7 +108,11 @@ function DiffView({
   // Build a proper LCS diff for side-by-side display
   // We'll align lines using a simple approach
   const maxLines = Math.max(baseLines.length, variantLines.length);
-  const pairs: Array<{ base: string | null; variant: string | null; status: "same" | "changed" | "added" | "removed" }> = [];
+  const pairs: Array<{
+    base: string | null;
+    variant: string | null;
+    status: "same" | "changed" | "added" | "removed";
+  }> = [];
 
   // Build sets for quick lookup
   const baseLineSet = new Map<string, number[]>();
@@ -171,9 +175,7 @@ function DiffView({
 
   const displayPairs =
     changedIndices.size > 0
-      ? pairs
-          .map((p, i) => ({ ...p, idx: i }))
-          .filter((p) => changedIndices.has(p.idx))
+      ? pairs.map((p, i) => ({ ...p, idx: i })).filter((p) => changedIndices.has(p.idx))
       : pairs.slice(0, 100); // fallback: show first 100 lines if identical
 
   return (
@@ -368,7 +370,9 @@ function VariantCard({
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
                 Tailoring Notes
               </p>
-              <p className="text-xs text-foreground whitespace-pre-wrap">{variant.tailoring_notes}</p>
+              <p className="text-xs text-foreground whitespace-pre-wrap">
+                {variant.tailoring_notes}
+              </p>
             </div>
           )}
 
@@ -590,7 +594,9 @@ function CVDetail() {
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
                       Notes
                     </p>
-                    <p className="text-sm text-foreground whitespace-pre-wrap">{cv.tailoring_notes}</p>
+                    <p className="text-sm text-foreground whitespace-pre-wrap">
+                      {cv.tailoring_notes}
+                    </p>
                   </div>
                 )}
                 {cv.target_job_description && (
@@ -686,11 +692,7 @@ function CVDetail() {
                     <div key={v.id} className="relative">
                       {/* Horizontal connector */}
                       <div className="absolute -left-2.5 top-4 w-3 h-px bg-border" />
-                      <VariantCard
-                        variant={v}
-                        baseCV={cv}
-                        onCompare={setCompareVariant}
-                      />
+                      <VariantCard variant={v} baseCV={cv} onCompare={setCompareVariant} />
                     </div>
                   ))}
                 </div>

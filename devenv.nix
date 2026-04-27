@@ -30,9 +30,6 @@
     '';
   };
 
-  # Claude CLI proxy: standalone Bun server for subprocess spawning
-  processes.claude-proxy.exec = "bun run scripts/claude-proxy.ts";
-
   services.postgres = {
     enable = true;
     package = pkgs.postgresql_16;
@@ -62,7 +59,6 @@
     echo "Services (start with 'devenv up' in another terminal):"
     echo "  - postgres on port 5455"
     echo "  - caddy on port 8443 (reverse proxy to localhost:3000)"
-    echo "  - claude-proxy on port 3001 (Claude CLI bridge)"
     echo ""
     echo "Commands:"
     echo "  - dev: Start Vite dev server (port 3000)"

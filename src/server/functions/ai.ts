@@ -44,6 +44,90 @@ export const analyzeCV = createServerFn({ method: "POST" })
     return result;
   });
 
+export type PrepareAIStreamResponse =
+  | {
+      ok: true;
+      sessionId: string;
+      systemPrompt: string;
+      userPrompt: string;
+      model: string;
+    }
+  | { ok: false; error: string };
+
+export const prepareAIStream = createServerFn({ method: "POST" })
+  .inputValidator(
+    (input: { baseCvId: string; jobDescription: string; applicationId?: string }) => input,
+  )
+  .handler(async ({ data }): Promise<PrepareAIStreamResponse> => {
+    return Effect.runPromise(
+      AIService.pipe(
+        Effect.flatMap((svc) =>
+          svc.prepareStreamingSession(data.baseCvId, data.jobDescription, data.applicationId),
+        ),
+        Effect.map(
+          (r): PrepareAIStreamResponse => ({
+            ok: true,
+            sessionId: r.session.id,
+            systemPrompt: r.systemPrompt,
+            userPrompt: r.userPrompt,
+            model: r.model,
+          }),
+        ),
+        Effect.catchTag("AIError", (e) => Effect.succeed({ ok: false as const, error: e.message })),
+        Effect.catchTag("CVNotFoundError", (e) =>
+          Effect.succeed({ ok: false as const, error: `CV not found: ${e.id}` }),
+        ),
+        Effect.catchAll((e) =>
+          Effect.succeed({ ok: false as const, error: `Unexpected error: ${String(e)}` }),
+        ),
+        Effect.provide(AppLive),
+      ),
+    );
+  });
+
+export type FinalizeAIStreamResponse =
+  | { ok: true; sessionId: string; analysis: AIAnalysisResult }
+  | { ok: false; error: string };
+
+export const finalizeAIStream = createServerFn({ method: "POST" })
+  .inputValidator(
+    (input: {
+      sessionId: string;
+      rawResponse: string;
+      inputTokens: number;
+      outputTokens: number;
+    }) => input,
+  )
+  .handler(async ({ data }): Promise<FinalizeAIStreamResponse> => {
+    return Effect.runPromise(
+      AIService.pipe(
+        Effect.flatMap((svc) =>
+          svc.finalizeStreamingSession(
+            data.sessionId,
+            data.rawResponse,
+            data.inputTokens,
+            data.outputTokens,
+          ),
+        ),
+        Effect.map(
+          (r): FinalizeAIStreamResponse => ({
+            ok: true,
+            sessionId: r.session.id,
+            analysis: r.analysis,
+          }),
+        ),
+        Effect.catchTag("AIError", (e) => Effect.succeed({ ok: false as const, error: e.message })),
+        Effect.catchTag("AISessionNotFoundError", (e) =>
+          Effect.succeed({ ok: false as const, error: `AI session not found: ${e.id}` }),
+        ),
+        Effect.catchAll((e) =>
+          Effect.succeed({ ok: false as const, error: `Unexpected error: ${String(e)}` }),
+        ),
+        Effect.provide(AppLive),
+      ),
+    );
+  });
+
 export const acceptAISession = createServerFn({ method: "POST" })
   .inputValidator(
     (input: {

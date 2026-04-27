@@ -187,8 +187,7 @@ function UploadCV() {
                 htmlFor="target-company"
                 className="mb-1.5 block text-sm font-medium text-foreground"
               >
-                Target Company{" "}
-                <span className="font-normal text-muted-foreground">(optional)</span>
+                Target Company <span className="font-normal text-muted-foreground">(optional)</span>
               </label>
               <input
                 id="target-company"
@@ -206,8 +205,7 @@ function UploadCV() {
                 htmlFor="target-role"
                 className="mb-1.5 block text-sm font-medium text-foreground"
               >
-                Target Role{" "}
-                <span className="font-normal text-muted-foreground">(optional)</span>
+                Target Role <span className="font-normal text-muted-foreground">(optional)</span>
               </label>
               <input
                 id="target-role"

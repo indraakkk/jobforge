@@ -1,9 +1,4 @@
-import {
-  createFileRoute,
-  Link,
-  useNavigate,
-  useRouter,
-} from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { ConfirmDeleteDialog } from "~/components/ConfirmDeleteDialog";
 import { CVPreviewPanel } from "~/components/CVPreviewPanel";
@@ -12,28 +7,16 @@ import { QAEntryCard } from "~/components/QAEntryCard";
 import { QAInlineForm } from "~/components/QAInlineForm";
 import { StatusBadge } from "~/components/StatusBadge";
 import { StatusPipeline } from "~/components/StatusPipeline";
-import {
-  deleteApplication,
-  getApplication,
-} from "~/server/functions/applications";
-import {
-  getCVsByApplication,
-  type SerializedCVFile,
-} from "~/server/functions/cv";
-import {
-  deleteQAEntry,
-  getQAEntriesByApplication,
-  updateQAEntry,
-} from "~/server/functions/qa";
+import { deleteApplication, getApplication } from "~/server/functions/applications";
+import { getCVsByApplication, type SerializedCVFile } from "~/server/functions/cv";
+import { deleteQAEntry, getQAEntriesByApplication, updateQAEntry } from "~/server/functions/qa";
 
 export const Route = createFileRoute("/applications/$id/")({
   loader: async ({ params }) => {
     const [app, qaEntries, linkedCVs] = await Promise.all([
       getApplication({ data: { id: params.id } }),
       getQAEntriesByApplication({ data: { applicationId: params.id } }),
-      getCVsByApplication({ data: { applicationId: params.id } }) as Promise<
-        SerializedCVFile[]
-      >,
+      getCVsByApplication({ data: { applicationId: params.id } }) as Promise<SerializedCVFile[]>,
     ]);
     return { app, qaEntries, linkedCVs };
   },
@@ -63,10 +46,7 @@ function ApplicationWorkspace() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">
-            {app.role}{" "}
-            <span className="text-muted-foreground font-normal">
-              @ {app.company}
-            </span>
+            {app.role} <span className="text-muted-foreground font-normal">@ {app.company}</span>
           </h1>
         </div>
         <div className="flex gap-2">
@@ -127,8 +107,7 @@ function ApplicationWorkspace() {
           {/* Q&A Section */}
           <div>
             <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Q&A ({qaEntries.length}{" "}
-              {qaEntries.length === 1 ? "entry" : "entries"})
+              Q&A ({qaEntries.length} {qaEntries.length === 1 ? "entry" : "entries"})
             </h2>
             <div className="space-y-3">
               {qaEntries.map((entry) => (
@@ -139,10 +118,7 @@ function ApplicationWorkspace() {
                   onDelete={handleDeleteQA}
                 />
               ))}
-              <QAInlineForm
-                applicationId={app.id}
-                onSuccess={() => router.invalidate()}
-              />
+              <QAInlineForm applicationId={app.id} onSuccess={() => router.invalidate()} />
             </div>
           </div>
 
@@ -171,17 +147,11 @@ function ApplicationWorkspace() {
           <StatusBadge status={app.status} />
         </DetailCard>
 
-        {app.salary_range && (
-          <DetailCard label="Salary Range">{app.salary_range}</DetailCard>
-        )}
+        {app.salary_range && <DetailCard label="Salary Range">{app.salary_range}</DetailCard>}
 
-        {app.location && (
-          <DetailCard label="Location">{app.location}</DetailCard>
-        )}
+        {app.location && <DetailCard label="Location">{app.location}</DetailCard>}
 
-        {app.platform && (
-          <DetailCard label="Platform">{app.platform}</DetailCard>
-        )}
+        {app.platform && <DetailCard label="Platform">{app.platform}</DetailCard>}
 
         {app.url && (
           <DetailCard label="Job URL">
@@ -198,9 +168,7 @@ function ApplicationWorkspace() {
 
         {app.applied_at && (
           <DetailCard label="Applied">
-            <span className="font-mono">
-              {new Date(app.applied_at).toLocaleDateString()}
-            </span>
+            <span className="font-mono">{new Date(app.applied_at).toLocaleDateString()}</span>
           </DetailCard>
         )}
 
@@ -242,13 +210,7 @@ function ApplicationWorkspace() {
   );
 }
 
-function DetailCard({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function DetailCard({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="rounded-lg border border-border bg-card p-4">
       <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">

@@ -1,12 +1,7 @@
 import { Schema } from "effect";
 import { DateToString } from "~/lib/schemas/common";
 
-export const AISessionStatus = Schema.Literal(
-  "pending",
-  "completed",
-  "accepted",
-  "rejected",
-);
+export const AISessionStatus = Schema.Literal("pending", "completed", "accepted", "rejected");
 export type AISessionStatus = Schema.Schema.Type<typeof AISessionStatus>;
 
 export class AISession extends Schema.Class<AISession>("AISession")({

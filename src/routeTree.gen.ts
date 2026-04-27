@@ -25,6 +25,7 @@ import { Route as ApplicationsIdIndexRouteImport } from './routes/applications/$
 import { Route as QaIdEditRouteImport } from './routes/qa/$id/edit'
 import { Route as CvTailorHistoryRouteImport } from './routes/cv/tailor/history'
 import { Route as ApplicationsIdEditRouteImport } from './routes/applications/$id/edit'
+import { Route as ApiAiStreamRouteImport } from './routes/api/ai/stream'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -106,6 +107,11 @@ const ApplicationsIdEditRoute = ApplicationsIdEditRouteImport.update({
   path: '/edit',
   getParentRoute: () => ApplicationsIdRoute,
 } as any)
+const ApiAiStreamRoute = ApiAiStreamRouteImport.update({
+  id: '/api/ai/stream',
+  path: '/api/ai/stream',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -117,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/applications/': typeof ApplicationsIndexRoute
   '/cv/': typeof CvIndexRoute
   '/qa/': typeof QaIndexRoute
+  '/api/ai/stream': typeof ApiAiStreamRoute
   '/applications/$id/edit': typeof ApplicationsIdEditRoute
   '/cv/tailor/history': typeof CvTailorHistoryRoute
   '/qa/$id/edit': typeof QaIdEditRoute
@@ -133,6 +140,7 @@ export interface FileRoutesByTo {
   '/applications': typeof ApplicationsIndexRoute
   '/cv': typeof CvIndexRoute
   '/qa': typeof QaIndexRoute
+  '/api/ai/stream': typeof ApiAiStreamRoute
   '/applications/$id/edit': typeof ApplicationsIdEditRoute
   '/cv/tailor/history': typeof CvTailorHistoryRoute
   '/qa/$id/edit': typeof QaIdEditRoute
@@ -152,6 +160,7 @@ export interface FileRoutesById {
   '/applications/': typeof ApplicationsIndexRoute
   '/cv/': typeof CvIndexRoute
   '/qa/': typeof QaIndexRoute
+  '/api/ai/stream': typeof ApiAiStreamRoute
   '/applications/$id/edit': typeof ApplicationsIdEditRoute
   '/cv/tailor/history': typeof CvTailorHistoryRoute
   '/qa/$id/edit': typeof QaIdEditRoute
@@ -172,6 +181,7 @@ export interface FileRouteTypes {
     | '/applications/'
     | '/cv/'
     | '/qa/'
+    | '/api/ai/stream'
     | '/applications/$id/edit'
     | '/cv/tailor/history'
     | '/qa/$id/edit'
@@ -188,6 +198,7 @@ export interface FileRouteTypes {
     | '/applications'
     | '/cv'
     | '/qa'
+    | '/api/ai/stream'
     | '/applications/$id/edit'
     | '/cv/tailor/history'
     | '/qa/$id/edit'
@@ -206,6 +217,7 @@ export interface FileRouteTypes {
     | '/applications/'
     | '/cv/'
     | '/qa/'
+    | '/api/ai/stream'
     | '/applications/$id/edit'
     | '/cv/tailor/history'
     | '/qa/$id/edit'
@@ -225,6 +237,7 @@ export interface RootRouteChildren {
   ApplicationsIndexRoute: typeof ApplicationsIndexRoute
   CvIndexRoute: typeof CvIndexRoute
   QaIndexRoute: typeof QaIndexRoute
+  ApiAiStreamRoute: typeof ApiAiStreamRoute
   CvTailorHistoryRoute: typeof CvTailorHistoryRoute
   CvIdIndexRoute: typeof CvIdIndexRoute
   CvTailorIndexRoute: typeof CvTailorIndexRoute
@@ -344,6 +357,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApplicationsIdEditRouteImport
       parentRoute: typeof ApplicationsIdRoute
     }
+    '/api/ai/stream': {
+      id: '/api/ai/stream'
+      path: '/api/ai/stream'
+      fullPath: '/api/ai/stream'
+      preLoaderRoute: typeof ApiAiStreamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -383,6 +403,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApplicationsIndexRoute: ApplicationsIndexRoute,
   CvIndexRoute: CvIndexRoute,
   QaIndexRoute: QaIndexRoute,
+  ApiAiStreamRoute: ApiAiStreamRoute,
   CvTailorHistoryRoute: CvTailorHistoryRoute,
   CvIdIndexRoute: CvIdIndexRoute,
   CvTailorIndexRoute: CvTailorIndexRoute,

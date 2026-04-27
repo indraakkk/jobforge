@@ -7,9 +7,9 @@ import {
   getCVFileData,
   getCVFiles,
   linkCVToApplication,
+  type SerializedCVFile,
   unlinkCVFromApplication,
   uploadAndLinkCV,
-  type SerializedCVFile,
 } from "~/server/functions/cv";
 
 const ALLOWED_TYPES = [
@@ -32,10 +32,7 @@ interface CVPreviewPanelProps {
   linkedCVs?: CVItem[];
 }
 
-export function CVPreviewPanel({
-  applicationId,
-  linkedCVs = [],
-}: CVPreviewPanelProps) {
+export function CVPreviewPanel({ applicationId, linkedCVs = [] }: CVPreviewPanelProps) {
   const router = useRouter();
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -98,7 +95,7 @@ export function CVPreviewPanel({
   async function handleShowLinkExisting() {
     setShowLinkExisting(true);
     try {
-      const bases = await getCVFiles({ data: {} }) as SerializedCVFile[];
+      const bases = (await getCVFiles({ data: {} })) as SerializedCVFile[];
       // For each base that has variants, fetch them too
       const variantResults = await Promise.all(
         bases
@@ -234,11 +231,7 @@ export function CVPreviewPanel({
           disabled={!linkCVId || linking}
           className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
-          {linking ? (
-            <Loader2 className="size-3 animate-spin" />
-          ) : (
-            <Link2 className="size-3" />
-          )}
+          {linking ? <Loader2 className="size-3 animate-spin" /> : <Link2 className="size-3" />}
           {linking ? "Linking..." : "Link"}
         </button>
         <button
@@ -312,9 +305,7 @@ export function CVPreviewPanel({
         ) : (
           <>
             <Upload className="mb-1 size-5 text-muted-foreground/50" />
-            <p className="text-xs text-muted-foreground">
-              Drop PDF/DOCX or click to browse
-            </p>
+            <p className="text-xs text-muted-foreground">Drop PDF/DOCX or click to browse</p>
           </>
         )}
       </div>
@@ -333,11 +324,7 @@ export function CVPreviewPanel({
           disabled={!selectedFile || !fileName.trim() || uploading}
           className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors disabled:opacity-50"
         >
-          {uploading ? (
-            <Loader2 className="size-3 animate-spin" />
-          ) : (
-            <Upload className="size-3" />
-          )}
+          {uploading ? <Loader2 className="size-3 animate-spin" /> : <Upload className="size-3" />}
           {uploading ? "Uploading..." : "Upload & Link"}
         </button>
         <button
@@ -361,15 +348,10 @@ export function CVPreviewPanel({
         </h3>
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <FileText className="mb-3 size-10 text-muted-foreground/40" />
-          <p className="text-sm font-medium text-muted-foreground">
-            No CV linked yet
-          </p>
+          <p className="text-sm font-medium text-muted-foreground">No CV linked yet</p>
           <p className="mt-1 text-xs text-muted-foreground/60">
             Link a CV from the{" "}
-            <Link
-              to="/cv"
-              className="text-primary hover:text-primary/80 transition-colors"
-            >
+            <Link to="/cv" className="text-primary hover:text-primary/80 transition-colors">
               CV Manager
             </Link>{" "}
             to see it here.
@@ -441,12 +423,8 @@ export function CVPreviewPanel({
         ) : (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <FileText className="mb-2 size-8 text-muted-foreground/40" />
-            <p className="text-sm text-muted-foreground">
-              No preview available for DOCX
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground/60">
-              Download the file to view it
-            </p>
+            <p className="text-sm text-muted-foreground">No preview available for DOCX</p>
+            <p className="mt-1 text-xs text-muted-foreground/60">Download the file to view it</p>
           </div>
         )}
       </div>

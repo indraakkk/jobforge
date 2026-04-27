@@ -6,18 +6,14 @@ import {
   ClaudeTimeoutError,
 } from "~/lib/errors/claude";
 import { ClaudeResponse } from "~/lib/schemas/claude";
+import {
+  type AskOptions,
+  armLifecycle,
+  buildArgs,
+  CLAUDE_BIN,
+} from "~/lib/services/claudeCli/spawn";
 
-export interface AskOptions {
-  readonly model?: string;
-  readonly systemPrompt?: string;
-  readonly allowedTools?: ReadonlyArray<string>;
-  readonly tools?: string;
-  readonly timeout?: number;
-  readonly maxBudgetUsd?: number;
-  readonly dangerouslySkipPermissions?: boolean;
-  readonly noSessionPersistence?: boolean;
-  readonly additionalArgs?: ReadonlyArray<string>;
-}
+export type { AskOptions } from "~/lib/services/claudeCli/spawn";
 
 type ClaudeError = ClaudeSpawnError | ClaudeExitError | ClaudeParseError | ClaudeTimeoutError;
 
@@ -26,9 +22,12 @@ export class ClaudeCliService extends Context.Tag("ClaudeCliService")<
   {
     readonly ask: (
       prompt: string,
-      options?: AskOptions,
+      options?: AskOptions & { timeout?: number },
     ) => Effect.Effect<ClaudeResponse, ClaudeError>;
-    readonly askText: (prompt: string, options?: AskOptions) => Effect.Effect<string, ClaudeError>;
+    readonly askText: (
+      prompt: string,
+      options?: AskOptions & { timeout?: number },
+    ) => Effect.Effect<string, ClaudeError>;
   }
 >() {}
 
@@ -37,35 +36,40 @@ const decodeResponse = Schema.decodeUnknown(ClaudeResponse);
 export const ClaudeCliLayer = Layer.effect(
   ClaudeCliService,
   Effect.gen(function* () {
-    const proxyUrl = yield* Config.string("CLAUDE_PROXY_URL").pipe(
-      Config.withDefault("http://localhost:3001"),
-    );
     const defaultTimeoutMs = yield* Config.number("CLAUDE_TIMEOUT_MS").pipe(
       Config.withDefault(300_000),
     );
 
     const runClaude = (
       prompt: string,
-      opts?: AskOptions,
+      opts?: AskOptions & { timeout?: number },
     ): Effect.Effect<ClaudeResponse, ClaudeError> => {
       const timeoutMs = opts?.timeout ?? defaultTimeoutMs;
 
       return Effect.tryPromise({
         try: async () => {
-          const res = await fetch(`${proxyUrl}/ask`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ prompt, options: opts }),
+          const proc = Bun.spawn([CLAUDE_BIN, ...buildArgs(prompt, opts ?? {}, "json")], {
+            stdout: "pipe",
+            stderr: "pipe",
           });
-          const body = (await res.json()) as { ok: boolean; stdout: string; error: string };
-          if (!body.ok) {
-            throw new Error(body.error ?? `Proxy error ${res.status}`);
+          const cancelLifecycle = armLifecycle(proc);
+          try {
+            const [stdout, stderr] = await Promise.all([
+              new Response(proc.stdout).text(),
+              new Response(proc.stderr).text(),
+            ]);
+            const exitCode = await proc.exited;
+            if (exitCode !== 0 && !stdout.trim()) {
+              throw new Error(stderr.slice(0, 500) || `claude exited with code ${exitCode}`);
+            }
+            return stdout;
+          } finally {
+            cancelLifecycle();
           }
-          return body.stdout;
         },
         catch: (e) =>
           new ClaudeSpawnError({
-            message: `Claude proxy error: ${e instanceof Error ? e.message : String(e)}`,
+            message: `Claude CLI failed: ${e instanceof Error ? e.message : String(e)}`,
             cause: e,
           }),
       }).pipe(

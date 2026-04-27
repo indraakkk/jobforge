@@ -31,3 +31,9 @@ result/
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Debug artifacts (root-only — do not blanket-ignore PNGs)
+/.playwright-mcp/
+/cv-tailor-*.png
+/jd-header-check.png
+/test-cv.pdf
